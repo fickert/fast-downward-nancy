@@ -6,11 +6,9 @@ macro(fast_downward_set_compiler_flags)
     # we have to fix this.
     if(CMAKE_COMPILER_IS_GNUCXX OR ${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang")
         include(CheckCXXCompilerFlag)
-        check_cxx_compiler_flag( "-std=c++11" CXX11_FOUND )
-        if(CXX11_FOUND)
-             set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
-        else()
-            message(FATAL_ERROR "${CMAKE_CXX_COMPILER} does not support C++11, please use a different compiler")
+        check_cxx_compiler_flag( "-std=c++17" CXX17_FOUND )
+        if(NOT CXX17_FOUND)
+            message(FATAL_ERROR "${CMAKE_CXX_COMPILER} does not support C++17, please use a different compiler")
         endif()
 
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
@@ -96,8 +94,13 @@ macro(fast_downward_set_configuration_types)
     # Only for multi-config generators (like Visual Studio Projects) that choose
     # the build type at build time.
     if(CMAKE_CONFIGURATION_TYPES)
-        set(CMAKE_CONFIGURATION_TYPES "Debug;Release;Profile"
-            CACHE STRING "Reset the configurations to what we need" FORCE)
+        if(CMAKE_COMPILER_IS_GNUCXX OR ${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang")
+            set(CMAKE_CONFIGURATION_TYPES "Debug;Release;Profile"
+                CACHE STRING "Reset the configurations to what we need" FORCE)
+        else()
+            set(CMAKE_CONFIGURATION_TYPES "Debug;Release"
+                CACHE STRING "Reset the configurations to what we need" FORCE)
+        endif()
     endif()
 endmacro()
 
@@ -139,8 +142,8 @@ function(fast_downward_plugin)
     if(NOT _PLUGIN_NAME)
         message(FATAL_ERROR "fast_downward_plugin: 'NAME' argument required.")
     endif()
-    if(NOT _PLUGIN_SOURCES)
-        message(FATAL_ERROR "fast_downward_plugin: 'SOURCES' argument required.")
+    if(NOT _PLUGIN_SOURCES AND NOT _PLUGIN_DEPENDENCY_ONLY)
+        message(FATAL_ERROR "fast_downward_plugin: 'SOURCES' argument required if not DEPENDENCY_ONLY.")
     endif()
     fast_downward_add_existing_sources_to_list(_PLUGIN_SOURCES)
     # Check optional arguments.

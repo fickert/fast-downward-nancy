@@ -18,6 +18,7 @@ fast_downward_set_linker_flags()
 # Collect source files needed for the active plugins.
 include("${CMAKE_CURRENT_SOURCE_DIR}/DownwardFiles.cmake")
 add_executable(downward ${PLANNER_SOURCES})
+set_property(TARGET downward PROPERTY CXX_STANDARD 17)
 
 ## == Includes ==
 
@@ -71,4 +72,10 @@ if(PLUGIN_LP_SOLVER_ENABLED AND USE_LP)
             $<TARGET_FILE_DIR:downward>
         )
     endif()
+endif()
+
+if(PLUGIN_BOOST_ENABLED)
+    find_package(Boost)
+    include_directories(${Boost_INCLUDE_DIR})
+    target_link_libraries(downward ${Boost_LIBRARIES})
 endif()
