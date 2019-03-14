@@ -760,6 +760,18 @@ fast_downward_plugin(
     DEPENDENCY_ONLY
 )
 
+fast_downward_plugin(
+    NAME REAL_TIME
+    HELP "Real-time search"
+    SOURCES
+        real_time/decision_strategy
+        real_time/dijkstra_learning
+        real_time/learning_evaluator
+        real_time/lookhead_search
+        real_time/real_time_search
+    DEPENDS SEARCH_COMMON
+)
+
 fast_downward_add_plugin_sources(PLANNER_SOURCES)
 
 # The order in PLANNER_SOURCES influences the order in which object

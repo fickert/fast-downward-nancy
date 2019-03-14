@@ -35,7 +35,16 @@ public:
     bool operator!=(const StateID &other) const {
         return !(*this == other);
     }
+
+    size_t hash() const {
+        return value;
+    }
 };
 
+namespace std {
+template<> struct hash<StateID> {
+	auto operator()(const StateID &state_id) const noexcept { return state_id.hash(); }
+};
+}
 
 #endif
