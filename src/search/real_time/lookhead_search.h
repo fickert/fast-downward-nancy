@@ -23,9 +23,9 @@ protected:
 	TaskProxy task_proxy;
 	StateRegistry &state_registry;
 	const successor_generator::SuccessorGenerator &successor_generator;
+	std::unique_ptr<SearchStatistics> statistics;
 
 	std::unique_ptr<SearchSpace> search_space;
-	int expanded;
 	const int lookahead_bound;
 	std::vector<StateID> frontier;
 
@@ -51,6 +51,7 @@ public:
 
 	auto found_solution() const -> bool {return solution_found;}
 	auto get_plan() const -> const Plan & {return plan;}
+	auto get_statistics() const -> const SearchStatistics & {return *statistics;}
 
 	auto get_search_space() const -> SearchSpace & { return *search_space; }
 	auto get_frontier() const -> const decltype(frontier) & { return frontier; }

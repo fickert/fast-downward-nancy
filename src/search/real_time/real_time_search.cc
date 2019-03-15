@@ -73,6 +73,14 @@ SearchStatus RealTimeSearch::step() {
 	lookahead_search->initialize(current_state);
 	const auto status = lookahead_search->search();
 
+	const SearchStatistics &current_stats = lookahead_search->get_statistics();
+	statistics.inc_expanded(current_stats.get_expanded());
+	statistics.inc_evaluated_states(current_stats.get_evaluated_states());
+	statistics.inc_evaluations(current_stats.get_evaluations());
+	statistics.inc_generated(current_stats.get_generated());
+	statistics.inc_generated_ops(current_stats.get_generated_ops());
+	statistics.inc_reopened(current_stats.get_reopened());
+
 	if (status == FAILED)
 		return FAILED;
 
