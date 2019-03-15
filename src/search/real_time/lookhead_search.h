@@ -15,6 +15,8 @@
 
 namespace real_time {
 
+class ExpansionDelay;
+
 class LookaheadSearch {
 	bool solution_found;
 	Plan plan;
@@ -33,11 +35,17 @@ protected:
 	std::unordered_map<StateID, std::vector<std::pair<StateID, OperatorProxy>>> predecessors;
 	std::unordered_set<StateID> closed;
 
+	ExpansionDelay *expansion_delay;
+	std::unordered_map<StateID, int> open_list_insertion_time;
+
+	void mark_expanded(SearchNode &node);
+
 	bool check_goal_and_set_plan(const GlobalState &state);
 public:
 	LookaheadSearch(StateRegistry &state_registry,
 	                int lookahead_bound,
-	                bool store_exploration_data);
+	                bool store_exploration_data,
+	                ExpansionDelay *expansion_delay);
 	virtual ~LookaheadSearch() = default;
 
 	LookaheadSearch(const LookaheadSearch &) = delete;
@@ -59,16 +67,38 @@ public:
 	auto get_closed() const -> const decltype(closed) & { return closed; }
 };
 
-class AStarLookaheadSearch : public LookaheadSearch {
-	std::shared_ptr<Evaluator> heuristic;
-	std::shared_ptr<Evaluator> f_evaluator;
-
+class EagerLookaheadSearch : public LookaheadSearch {
 	std::unique_ptr<StateOpenList> open_list;
+protected:
+	virtual auto create_open_list() const -> std::unique_ptr<StateOpenList> = 0;
+public:
+	EagerLookaheadSearch(StateRegistry &state_registry,
+	                     int lookahead_bound,
+	                     bool store_exploration_data,
+	                     ExpansionDelay *expansion_delay);
+	~EagerLookaheadSearch() override = default;
+
+	EagerLookaheadSearch(const EagerLookaheadSearch &) = delete;
+	EagerLookaheadSearch(EagerLookaheadSearch &&) = delete;
+
+	auto operator=(const EagerLookaheadSearch &) = delete;
+	auto operator=(EagerLookaheadSearch &&) = delete;
+
+	void initialize(const GlobalState &initial_state) override;
+	auto search() -> SearchStatus override;
+};
+
+class AStarLookaheadSearch : public EagerLookaheadSearch {
+	std::shared_ptr<Evaluator> f_evaluator;
+	std::shared_ptr<Evaluator> heuristic;
+protected:
+	auto create_open_list() const -> std::unique_ptr<StateOpenList> override;
 public:
 	AStarLookaheadSearch(StateRegistry &state_registry,
 	                     int lookahead_bound,
 	                     std::shared_ptr<Evaluator> heuristic,
-	                     bool store_exploration_data);
+	                     bool store_exploration_data,
+	                     ExpansionDelay *expansion_delay);
 	~AStarLookaheadSearch() override = default;
 
 	AStarLookaheadSearch(const AStarLookaheadSearch &) = delete;
@@ -76,9 +106,23 @@ public:
 
 	auto operator=(const AStarLookaheadSearch &) = delete;
 	auto operator=(AStarLookaheadSearch &&) = delete;
+};
 
-	void initialize(const GlobalState &initial_state) override;
-	auto search() -> SearchStatus override;
+class BreadthFirstLookaheadSearch : public EagerLookaheadSearch {
+protected:
+	auto create_open_list() const->std::unique_ptr<StateOpenList> override;
+public:
+	BreadthFirstLookaheadSearch(StateRegistry &state_registry,
+		int lookahead_bound,
+		bool store_exploration_data,
+		ExpansionDelay *expansion_delay);
+	~BreadthFirstLookaheadSearch() override = default;
+
+	BreadthFirstLookaheadSearch(const BreadthFirstLookaheadSearch &) = delete;
+	BreadthFirstLookaheadSearch(BreadthFirstLookaheadSearch &&) = delete;
+
+	auto operator=(const BreadthFirstLookaheadSearch &) = delete;
+	auto operator=(BreadthFirstLookaheadSearch &&) = delete;
 };
 
 }

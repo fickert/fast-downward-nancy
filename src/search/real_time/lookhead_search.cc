@@ -1,13 +1,24 @@
 #include "lookhead_search.h"
 
+#include "expansion_delay.h"
 #include "../evaluators/g_evaluator.h"
 #include "../evaluators/sum_evaluator.h"
 #include "../open_lists/tiebreaking_open_list.h"
 #include "../options/plugin.h"
 #include "../tasks/root_task.h"
 #include "../task_utils/task_properties.h"
+#include "../open_lists/best_first_open_list.h"
 
 namespace real_time {
+
+void LookaheadSearch::mark_expanded(SearchNode &node) {
+	statistics->inc_expanded();
+	node.close();
+	if (store_exploration_data)
+		closed.emplace(node.get_state_id());
+	if (expansion_delay)
+		expansion_delay->update_expansion_delay(statistics->get_expanded() - open_list_insertion_time[node.get_state_id()]);
+}
 
 auto LookaheadSearch::check_goal_and_set_plan(const GlobalState &state) -> bool {
 	if (task_properties::is_goal_state(task_proxy, state)) {
@@ -19,14 +30,15 @@ auto LookaheadSearch::check_goal_and_set_plan(const GlobalState &state) -> bool 
 	return false;
 }
 
-LookaheadSearch::LookaheadSearch(StateRegistry &state_registry, int lookahead_bound, bool store_exploration_data) :
+LookaheadSearch::LookaheadSearch(StateRegistry &state_registry, int lookahead_bound, bool store_exploration_data, ExpansionDelay *expansion_delay) :
 	solution_found(false),
 	task(tasks::g_root_task),
 	task_proxy(*task),
 	state_registry(state_registry),
 	successor_generator(successor_generator::g_successor_generators[task_proxy]),
 	lookahead_bound(lookahead_bound),
-	store_exploration_data(store_exploration_data) {}
+	store_exploration_data(store_exploration_data),
+	expansion_delay(expansion_delay) {}
 
 void LookaheadSearch::initialize(const GlobalState &initial_state) {
 	solution_found = false;
@@ -41,27 +53,24 @@ void LookaheadSearch::initialize(const GlobalState &initial_state) {
 		closed.clear();
 		closed.reserve(lookahead_bound);
 	}
+	if (expansion_delay)
+		open_list_insertion_time.clear();
 }
 
-AStarLookaheadSearch::AStarLookaheadSearch(StateRegistry &state_registry, int lookahead_bound, std::shared_ptr<Evaluator> heuristic, bool store_exploration_data) :
-	LookaheadSearch(state_registry, lookahead_bound, store_exploration_data),
-	heuristic(heuristic),
-	f_evaluator(std::make_shared<sum_evaluator::SumEvaluator>(std::vector<std::shared_ptr<Evaluator>>{heuristic, std::make_shared<g_evaluator::GEvaluator>()})) {}
+EagerLookaheadSearch::EagerLookaheadSearch(StateRegistry &state_registry, int lookahead_bound, bool store_exploration_data, ExpansionDelay *expansion_delay) :
+	LookaheadSearch(state_registry, lookahead_bound, store_exploration_data, expansion_delay) {}
 
-void AStarLookaheadSearch::initialize(const GlobalState &initial_state) {
+void EagerLookaheadSearch::initialize(const GlobalState &initial_state) {
 	LookaheadSearch::initialize(initial_state);
-	const auto evaluators = std::vector<std::shared_ptr<Evaluator>>{f_evaluator, heuristic};
-	auto options = options::Options();
-	options.set("evals", evaluators);
-	options.set("pref_only", false);
-	options.set("unsafe_pruning", false);
-	open_list = std::make_unique<tiebreaking_open_list::TieBreakingOpenListFactory>(options)->create_state_open_list();
+	open_list = create_open_list();
 	auto eval_context = EvaluationContext(initial_state, 0, false, statistics.get());
 	statistics->inc_evaluated_states();
 	open_list->insert(eval_context, initial_state.get_id());
+	if (expansion_delay)
+		open_list_insertion_time[initial_state.get_id()] = 0;
 }
 
-auto AStarLookaheadSearch::search() -> SearchStatus {
+auto EagerLookaheadSearch::search() -> SearchStatus {
 	assert(statistics);
 	while (statistics->get_expanded() < lookahead_bound) {
 		if (open_list->empty())
@@ -74,10 +83,7 @@ auto AStarLookaheadSearch::search() -> SearchStatus {
 		if (node.is_closed())
 			continue;
 
-		statistics->inc_expanded();
-		node.close();
-		if (store_exploration_data)
-			closed.emplace(node.get_state_id());
+		mark_expanded(node);
 
 		if (check_goal_and_set_plan(state))
 			return SOLVED;
@@ -118,12 +124,36 @@ auto AStarLookaheadSearch::search() -> SearchStatus {
 				auto succ_eval_context = EvaluationContext(succ_state, succ_node.get_g(), false, statistics.get());
 				open_list->insert(succ_eval_context, succ_state.get_id());
 			}
+			open_list_insertion_time[id] = statistics->get_expanded();
 		}
 	}
 	while (!open_list->empty())
 		frontier.push_back(open_list->remove_min());
 	return IN_PROGRESS;
 }
+
+auto AStarLookaheadSearch::create_open_list() const -> std::unique_ptr<StateOpenList> {
+	auto options = options::Options();
+	options.set("evals", std::vector<std::shared_ptr<Evaluator>>{f_evaluator, heuristic});
+	options.set("pref_only", false);
+	options.set("unsafe_pruning", false);
+	return std::make_unique<tiebreaking_open_list::TieBreakingOpenListFactory>(options)->create_state_open_list();
+}
+
+AStarLookaheadSearch::AStarLookaheadSearch(StateRegistry &state_registry, int lookahead_bound, std::shared_ptr<Evaluator> heuristic, bool store_exploration_data, ExpansionDelay *expansion_delay) :
+	EagerLookaheadSearch(state_registry, lookahead_bound, store_exploration_data, expansion_delay),
+	f_evaluator(std::make_shared<sum_evaluator::SumEvaluator>(std::vector<std::shared_ptr<Evaluator>>{heuristic, std::make_shared<g_evaluator::GEvaluator>()})),
+	heuristic(heuristic) {}
+
+auto BreadthFirstLookaheadSearch::create_open_list() const -> std::unique_ptr<StateOpenList> {
+	auto options = options::Options();
+	options.set<std::shared_ptr<Evaluator>>("eval", std::make_shared<g_evaluator::GEvaluator>());
+	options.set("pref_only", false);
+	return std::make_unique<standard_scalar_open_list::BestFirstOpenListFactory>(options)->create_state_open_list();
+}
+
+BreadthFirstLookaheadSearch::BreadthFirstLookaheadSearch(StateRegistry &state_registry, int lookahead_bound, bool store_exploration_data, ExpansionDelay *expansion_delay) :
+	EagerLookaheadSearch(state_registry, lookahead_bound, store_exploration_data, expansion_delay) {}
 
 static options::PluginTypePlugin<LookaheadSearch> _type_plugin("LookaheadSearch", "Lookahead search engine for real-time search");
 

@@ -3,6 +3,7 @@
 
 #include "decision_strategy.h"
 #include "dijkstra_learning.h"
+#include "expansion_delay.h"
 #include "lookhead_search.h"
 #include "../open_list.h"
 #include "../search_engine.h"
@@ -33,9 +34,15 @@ class RealTimeSearch : public SearchEngine {
 		K_BEST
 	};
 
+	const bool evaluate_heuristic_when_learning;
+
 	std::unique_ptr<LookaheadSearch> lookahead_search;
 	std::unique_ptr<DijkstraLearning> dijkstra_learning;
 	std::unique_ptr<real_time::DecisionStrategy> decision_strategy;
+
+	std::shared_ptr<Evaluator> distance_heuristic;
+	std::unique_ptr<ExpansionDelay> expansion_delay;
+	void initialize_f_hat_functions_if_required(const options::Options &opts);
 
 protected:
 	void initialize() override;
