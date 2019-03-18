@@ -42,7 +42,7 @@ class RealTimeSearch : public SearchEngine {
 
 	std::shared_ptr<Evaluator> distance_heuristic;
 	std::unique_ptr<ExpansionDelay> expansion_delay;
-	void initialize_f_hat_functions_if_required(const options::Options &opts);
+	void initialize_optional_features(const options::Options &opts);
 
 protected:
 	void initialize() override;

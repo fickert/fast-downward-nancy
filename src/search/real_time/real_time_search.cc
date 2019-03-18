@@ -17,7 +17,7 @@ RealTimeSearch::RealTimeSearch(const options::Options &opts)
 	heuristic = opts.get<std::shared_ptr<Evaluator>>("h");
 	if (opts.get<bool>("learning"))
 		heuristic = std::make_shared<LearningEvaluator>(heuristic);
-	initialize_f_hat_functions_if_required(opts);
+	initialize_optional_features(opts);
 	if (opts.get<bool>("learning"))
 		dijkstra_learning = std::make_unique<DijkstraLearning>(std::static_pointer_cast<LearningEvaluator>(heuristic), std::static_pointer_cast<LearningEvaluator>(distance_heuristic), state_registry);
 
@@ -52,11 +52,10 @@ RealTimeSearch::RealTimeSearch(const options::Options &opts)
 	heuristic->notify_initial_state(current_state);
 }
 
-void RealTimeSearch::initialize_f_hat_functions_if_required(const options::Options &opts) {
+void RealTimeSearch::initialize_optional_features(const options::Options &opts) {
 	if (LookaheadSearchMethod(opts.get_enum("lookahead_search")) == LookaheadSearchMethod::F_HAT ||
 		LookaheadSearchMethod(opts.get_enum("lookahead_search")) == LookaheadSearchMethod::RISK ||
 		DecisionStrategy(opts.get_enum("decision_strategy")) != DecisionStrategy::MINIMIN) {
-		expansion_delay = std::make_unique<ExpansionDelay>(opts.get<int>("expansion_delay_window_size"));
 		if (task_properties::is_unit_cost(task_proxy) || opts.get<std::shared_ptr<Evaluator>>("h") == opts.get<std::shared_ptr<Evaluator>>("distance_heuristic")) {
 			distance_heuristic = heuristic;
 		} else {
@@ -65,6 +64,8 @@ void RealTimeSearch::initialize_f_hat_functions_if_required(const options::Optio
 				distance_heuristic = std::make_shared<LearningEvaluator>(distance_heuristic);
 		}
 	}
+	if (LookaheadSearchMethod(opts.get_enum("lookahead_search")) == LookaheadSearchMethod::RISK)
+		expansion_delay = std::make_unique<ExpansionDelay>(opts.get<int>("expansion_delay_window_size"));
 }
 
 void RealTimeSearch::initialize() {
