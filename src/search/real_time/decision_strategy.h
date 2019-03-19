@@ -7,6 +7,7 @@
 #include <functional>
 
 class SearchSpace;
+class StateRegistry;
 
 namespace real_time {
 

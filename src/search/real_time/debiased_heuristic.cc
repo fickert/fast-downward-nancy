@@ -2,6 +2,8 @@
 
 #include "../evaluation_context.h"
 
+#include <cmath>
+
 namespace real_time {
 
 DebiasedHeuristic::DebiasedHeuristic(std::shared_ptr<Evaluator> heuristic, std::shared_ptr<Evaluator> distance, const HeuristicError &heuristic_error)
