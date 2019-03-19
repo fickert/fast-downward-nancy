@@ -3,8 +3,8 @@
 #include "../evaluators/g_evaluator.h"
 #include "../evaluators/sum_evaluator.h"
 #include "../plugin.h"
-#include "../utils/system.h"
 #include "../task_utils/task_properties.h"
+#include "../utils/system.h"
 
 namespace real_time {
 
@@ -27,6 +27,9 @@ RealTimeSearch::RealTimeSearch(const options::Options &opts)
 		break;
 	case LookaheadSearchMethod::BREADTH_FIRST:
 		lookahead_search = std::make_unique<BreadthFirstLookaheadSearch>(state_registry, opts.get<int>("lookahead_bound"), static_cast<bool>(dijkstra_learning), expansion_delay.get(), heuristic_error.get());
+		break;
+	case LookaheadSearchMethod::F_HAT:
+		lookahead_search = std::make_unique<FHatLookaheadSearch>(state_registry, opts.get<int>("lookahead_bound"), heuristic, distance_heuristic, static_cast<bool>(dijkstra_learning), expansion_delay.get(), *heuristic_error);
 		break;
 	default:
 		std::cerr << "unknown lookahead search method: " << opts.get_enum("lookahead_search") << std::endl;

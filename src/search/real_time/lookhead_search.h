@@ -132,6 +132,28 @@ public:
 	auto operator=(BreadthFirstLookaheadSearch &&) = delete;
 };
 
+class FHatLookaheadSearch : public EagerLookaheadSearch {
+	std::shared_ptr<Evaluator> f_hat_evaluator;
+	std::shared_ptr<Evaluator> heuristic;
+protected:
+	auto create_open_list() const -> std::unique_ptr<StateOpenList> override;
+public:
+	FHatLookaheadSearch(StateRegistry &state_registry,
+	                    int lookahead_bound,
+	                    std::shared_ptr<Evaluator> heuristic,
+	                    std::shared_ptr<Evaluator> distance,
+	                    bool store_exploration_data,
+	                    ExpansionDelay *expansion_delay,
+	                    HeuristicError &heuristic_error);
+	~FHatLookaheadSearch() override = default;
+
+	FHatLookaheadSearch(const FHatLookaheadSearch &) = delete;
+	FHatLookaheadSearch(FHatLookaheadSearch &&) = delete;
+
+	auto operator=(const FHatLookaheadSearch &) = delete;
+	auto operator=(FHatLookaheadSearch &&) = delete;
+};
+
 }
 
 #endif

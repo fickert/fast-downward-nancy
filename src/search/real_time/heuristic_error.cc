@@ -25,7 +25,7 @@ void HeuristicError::set_expanding_state(const GlobalState &state) {
 }
 
 void HeuristicError::add_successor(const SearchNode &successor_node, int op_cost) {
-	assert(successor_node.is_open());
+	assert(successor_node.is_open() || successor_node.is_closed());
 	auto eval_context = EvaluationContext(successor_node.get_state(), successor_node.get_g(), true, nullptr);
 	assert(!eval_context.is_evaluator_value_infinite(f_evaluator.get()));
 	const auto f_value = eval_context.get_evaluator_value(f_evaluator.get());
@@ -46,9 +46,11 @@ void HeuristicError::update_error() {
 		const auto heuristic_error = heuristic->is_estimate_cached(successor_state) + best_successor_op_cost - heuristic->get_cached_estimate(state);
 		average_heuristic_error += (heuristic_error - average_heuristic_error) / count;
 		if (distance) {
-			assert(distance->is_estimate_cached(state));
-			assert(distance->is_estimate_cached(successor_state));
-			const auto distance_error = distance->is_estimate_cached(successor_state) + 1 - distance->get_cached_estimate(state);
+			auto eval_context = EvaluationContext(state, 0, true, nullptr);
+			auto eval_context_successor = EvaluationContext(successor_state, 0, true, nullptr);
+			assert(!eval_context.is_evaluator_value_infinite(distance.get()));
+			assert(!eval_context_successor.is_evaluator_value_infinite(distance.get()));
+			const auto distance_error = eval_context_successor.get_evaluator_value(distance.get()) + 1 - eval_context.get_evaluator_value(distance.get());
 			average_distance_error += (distance_error - average_distance_error) / count;
 		}
 	}
