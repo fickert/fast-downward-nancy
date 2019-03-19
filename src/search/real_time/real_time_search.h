@@ -4,6 +4,7 @@
 #include "decision_strategy.h"
 #include "dijkstra_learning.h"
 #include "expansion_delay.h"
+#include "heuristic_error.h"
 #include "lookhead_search.h"
 #include "../open_list.h"
 #include "../search_engine.h"
@@ -42,6 +43,7 @@ class RealTimeSearch : public SearchEngine {
 
 	std::shared_ptr<Evaluator> distance_heuristic;
 	std::unique_ptr<ExpansionDelay> expansion_delay;
+	std::unique_ptr<HeuristicError> heuristic_error;
 	void initialize_optional_features(const options::Options &opts);
 
 protected:

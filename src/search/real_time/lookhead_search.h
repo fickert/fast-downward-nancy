@@ -15,6 +15,7 @@
 
 namespace real_time {
 
+class HeuristicError;
 class ExpansionDelay;
 
 class LookaheadSearch {
@@ -38,6 +39,8 @@ protected:
 	ExpansionDelay *expansion_delay;
 	std::unordered_map<StateID, int> open_list_insertion_time;
 
+	HeuristicError *heuristic_error;
+
 	void mark_expanded(SearchNode &node);
 
 	bool check_goal_and_set_plan(const GlobalState &state);
@@ -45,7 +48,8 @@ public:
 	LookaheadSearch(StateRegistry &state_registry,
 	                int lookahead_bound,
 	                bool store_exploration_data,
-	                ExpansionDelay *expansion_delay);
+	                ExpansionDelay *expansion_delay,
+	                HeuristicError *heuristic_error);
 	virtual ~LookaheadSearch() = default;
 
 	LookaheadSearch(const LookaheadSearch &) = delete;
@@ -75,7 +79,8 @@ public:
 	EagerLookaheadSearch(StateRegistry &state_registry,
 	                     int lookahead_bound,
 	                     bool store_exploration_data,
-	                     ExpansionDelay *expansion_delay);
+	                     ExpansionDelay *expansion_delay,
+	                     HeuristicError *heuristic_error);
 	~EagerLookaheadSearch() override = default;
 
 	EagerLookaheadSearch(const EagerLookaheadSearch &) = delete;
@@ -98,7 +103,8 @@ public:
 	                     int lookahead_bound,
 	                     std::shared_ptr<Evaluator> heuristic,
 	                     bool store_exploration_data,
-	                     ExpansionDelay *expansion_delay);
+	                     ExpansionDelay *expansion_delay,
+	                     HeuristicError *heuristic_error);
 	~AStarLookaheadSearch() override = default;
 
 	AStarLookaheadSearch(const AStarLookaheadSearch &) = delete;
@@ -113,9 +119,10 @@ protected:
 	auto create_open_list() const->std::unique_ptr<StateOpenList> override;
 public:
 	BreadthFirstLookaheadSearch(StateRegistry &state_registry,
-		int lookahead_bound,
-		bool store_exploration_data,
-		ExpansionDelay *expansion_delay);
+	                            int lookahead_bound,
+	                            bool store_exploration_data,
+	                            ExpansionDelay *expansion_delay,
+	                            HeuristicError *heuristic_error);
 	~BreadthFirstLookaheadSearch() override = default;
 
 	BreadthFirstLookaheadSearch(const BreadthFirstLookaheadSearch &) = delete;

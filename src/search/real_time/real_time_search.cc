@@ -23,10 +23,10 @@ RealTimeSearch::RealTimeSearch(const options::Options &opts)
 
 	switch (LookaheadSearchMethod(opts.get_enum("lookahead_search"))) {
 	case LookaheadSearchMethod::A_STAR:
-		lookahead_search = std::make_unique<AStarLookaheadSearch>(state_registry, opts.get<int>("lookahead_bound"), heuristic, static_cast<bool>(dijkstra_learning), expansion_delay.get());
+		lookahead_search = std::make_unique<AStarLookaheadSearch>(state_registry, opts.get<int>("lookahead_bound"), heuristic, static_cast<bool>(dijkstra_learning), expansion_delay.get(), heuristic_error.get());
 		break;
 	case LookaheadSearchMethod::BREADTH_FIRST:
-		lookahead_search = std::make_unique<BreadthFirstLookaheadSearch>(state_registry, opts.get<int>("lookahead_bound"), static_cast<bool>(dijkstra_learning), expansion_delay.get());
+		lookahead_search = std::make_unique<BreadthFirstLookaheadSearch>(state_registry, opts.get<int>("lookahead_bound"), static_cast<bool>(dijkstra_learning), expansion_delay.get(), heuristic_error.get());
 		break;
 	default:
 		std::cerr << "unknown lookahead search method: " << opts.get_enum("lookahead_search") << std::endl;
@@ -63,6 +63,7 @@ void RealTimeSearch::initialize_optional_features(const options::Options &opts) 
 			if (opts.get<bool>("learning"))
 				distance_heuristic = std::make_shared<LearningEvaluator>(distance_heuristic);
 		}
+		heuristic_error = std::make_unique<HeuristicError>(state_registry, heuristic, distance_heuristic);
 	}
 	if (LookaheadSearchMethod(opts.get_enum("lookahead_search")) == LookaheadSearchMethod::RISK)
 		expansion_delay = std::make_unique<ExpansionDelay>(opts.get<int>("expansion_delay_window_size"));

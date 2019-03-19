@@ -767,6 +767,7 @@ fast_downward_plugin(
         real_time/decision_strategy
         real_time/dijkstra_learning
         real_time/expansion_delay
+        real_time/heuristic_error
         real_time/learning_evaluator
         real_time/lookhead_search
         real_time/real_time_search
