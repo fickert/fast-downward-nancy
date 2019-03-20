@@ -151,6 +151,11 @@ void RealTimeSearch::print_statistics() const {
 	statistics.print_detailed_statistics();
 	std::cout << "Number of lookahead phases: " << num_rts_phases << std::endl;
 	std::cout << "Total solution cost: " << solution_cost << std::endl;
+	if (heuristic_error) {
+		std::cout << "Average heuristic error: " << heuristic_error->get_average_heuristic_error() << std::endl;
+		if (distance_heuristic)
+			std::cout << "Average distance error: " << heuristic_error->get_average_distance_error() << std::endl;
+	}
 }
 
 static auto _parse(options::OptionParser &parser) -> std::shared_ptr<SearchEngine> {
