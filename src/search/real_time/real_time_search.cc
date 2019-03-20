@@ -12,6 +12,7 @@ RealTimeSearch::RealTimeSearch(const options::Options &opts)
 	: SearchEngine(opts),
 	  current_state(state_registry.get_initial_state()),
 	  num_rts_phases(0),
+	  solution_cost(0),
 	  evaluate_heuristic_when_learning(LookaheadSearchMethod(opts.get_enum("lookahead_search")) == LookaheadSearchMethod::BREADTH_FIRST) {
 
 	heuristic = opts.get<std::shared_ptr<Evaluator>>("h");
@@ -114,6 +115,8 @@ SearchStatus RealTimeSearch::step() {
 		// NOTE: the returned plan does not correspond to the agent's actual movements as it removes cycles
 		search_space.trace_path(current_state, overall_plan);
 		auto plan = lookahead_search->get_plan();
+		for (auto op_id : plan)
+			solution_cost += task_proxy.get_operators()[op_id].get_cost();
 		overall_plan.insert(std::end(overall_plan), std::begin(plan), std::end(plan));
 		set_plan(overall_plan);
 		return SOLVED;
@@ -125,6 +128,7 @@ SearchStatus RealTimeSearch::step() {
 	const auto best_top_level_action = decision_strategy->get_top_level_action(lookahead_search->get_frontier(), lookahead_search->get_search_space());
 	const auto parent_node = search_space.get_node(current_state);
 	const auto op = task_proxy.get_operators()[best_top_level_action];
+	solution_cost += op.get_cost();
 	current_state = state_registry.get_successor_state(current_state, op);
 	auto next_node = search_space.get_node(current_state);
 	if (next_node.is_new())
@@ -135,6 +139,7 @@ SearchStatus RealTimeSearch::step() {
 void RealTimeSearch::print_statistics() const {
 	statistics.print_detailed_statistics();
 	std::cout << "Number of lookahead phases: " << num_rts_phases << std::endl;
+	std::cout << "Total solution cost: " << solution_cost << std::endl;
 }
 
 static auto _parse(options::OptionParser &parser) -> std::shared_ptr<SearchEngine> {

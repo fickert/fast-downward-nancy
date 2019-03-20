@@ -19,6 +19,7 @@ class RealTimeSearch : public SearchEngine {
 
 	// Statistics
 	int num_rts_phases;
+	int solution_cost;
 
 	enum class LookaheadSearchMethod {
 		A_STAR,
