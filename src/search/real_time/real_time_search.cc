@@ -5,6 +5,7 @@
 #include "../plugin.h"
 #include "../task_utils/task_properties.h"
 #include "../utils/system.h"
+#include "util.h"
 
 namespace real_time {
 
@@ -45,6 +46,16 @@ RealTimeSearch::RealTimeSearch(const options::Options &opts)
 			const auto node = lookahead_search_space.get_node(state);
 			auto eval_context = EvaluationContext(state, node.get_g(), false, nullptr, false);
 			return eval_context.get_evaluator_value_or_infinity(f_evaluator.get());
+		});
+		break;
+	}
+	case DecisionStrategy::BELLMAN: {
+		auto f_hat_evaluator = create_f_hat_evaluator(heuristic, distance_heuristic, *heuristic_error);
+		decision_strategy = std::make_unique<ScalarDecisionStrategy>(state_registry, [this, f_hat_evaluator](const StateID &state_id, SearchSpace &lookahead_search_space) {
+			const auto state = state_registry.lookup_state(state_id);
+			const auto node = lookahead_search_space.get_node(state);
+			auto eval_context = EvaluationContext(state, node.get_g(), false, nullptr, false);
+			return eval_context.get_evaluator_value_or_infinity(f_hat_evaluator.get());
 		});
 		break;
 	}

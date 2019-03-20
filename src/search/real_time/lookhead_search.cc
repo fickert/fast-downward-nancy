@@ -3,6 +3,7 @@
 #include "debiased_heuristic.h"
 #include "expansion_delay.h"
 #include "heuristic_error.h"
+#include "util.h"
 #include "../evaluators/g_evaluator.h"
 #include "../evaluators/sum_evaluator.h"
 #include "../open_lists/tiebreaking_open_list.h"
@@ -170,12 +171,6 @@ auto FHatLookaheadSearch::create_open_list() const -> std::unique_ptr<StateOpenL
 	options.set("pref_only", false);
 	options.set("unsafe_pruning", false);
 	return std::make_unique<tiebreaking_open_list::TieBreakingOpenListFactory>(options)->create_state_open_list();
-}
-
-auto create_f_hat_evaluator(std::shared_ptr<Evaluator> heuristic, std::shared_ptr<Evaluator> distance, HeuristicError &heuristic_error) -> std::shared_ptr<Evaluator> {
-	const auto h_hat_evaluator = std::make_shared<DebiasedHeuristic>(heuristic, distance, heuristic_error);
-	const auto g_evaluator = std::make_shared<g_evaluator::GEvaluator>();
-	return std::make_shared<sum_evaluator::SumEvaluator>(std::vector<std::shared_ptr<Evaluator>>{heuristic, g_evaluator});
 }
 
 FHatLookaheadSearch::FHatLookaheadSearch(StateRegistry &state_registry, int lookahead_bound, std::shared_ptr<Evaluator> heuristic, std::shared_ptr<Evaluator> distance, bool store_exploration_data, ExpansionDelay *expansion_delay, HeuristicError &heuristic_error) :

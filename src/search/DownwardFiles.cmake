@@ -772,6 +772,7 @@ fast_downward_plugin(
         real_time/learning_evaluator
         real_time/lookhead_search
         real_time/real_time_search
+        real_time/util
     DEPENDS SEARCH_COMMON
 )
 
