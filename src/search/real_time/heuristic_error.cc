@@ -43,14 +43,14 @@ void HeuristicError::update_error() {
 		const auto successor_state = state_registry.lookup_state(best_successor_id);
 		assert(heuristic->is_estimate_cached(state));
 		assert(heuristic->is_estimate_cached(successor_state));
-		const auto heuristic_error = heuristic->is_estimate_cached(successor_state) + best_successor_op_cost - heuristic->get_cached_estimate(state);
+		const auto heuristic_error = std::max(0, heuristic->get_cached_estimate(successor_state) + best_successor_op_cost - heuristic->get_cached_estimate(state));
 		average_heuristic_error += (heuristic_error - average_heuristic_error) / count;
 		if (distance) {
 			auto eval_context = EvaluationContext(state, 0, true, nullptr);
 			auto eval_context_successor = EvaluationContext(successor_state, 0, true, nullptr);
 			assert(!eval_context.is_evaluator_value_infinite(distance.get()));
 			assert(!eval_context_successor.is_evaluator_value_infinite(distance.get()));
-			const auto distance_error = eval_context_successor.get_evaluator_value(distance.get()) + 1 - eval_context.get_evaluator_value(distance.get());
+			const auto distance_error = std::min(1, std::max(0, eval_context_successor.get_evaluator_value(distance.get()) + 1 - eval_context.get_evaluator_value(distance.get())));
 			average_distance_error += (distance_error - average_distance_error) / count;
 		}
 	}
