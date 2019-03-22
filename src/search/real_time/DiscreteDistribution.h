@@ -1,5 +1,5 @@
 #pragma once
-#include <iostream>
+#include <cmath>
 #include <vector>
 #include <queue>
 #include <algorithm>
@@ -68,13 +68,13 @@ class DiscreteDistribution
 
 	double probabilityDensityFunction(double x, double mu, double var)
 	{
-		return ((1 / sqrt(2 * M_PI * var)) * exp(-(pow(x - mu, 2) / (2 * var))));
+		return ((1 / std::sqrt(2 * M_PI * var)) * std::exp(-(std::pow(x - mu, 2) / (2 * var))));
 	}
 
 	void resize(map<double, double>& distroMap)
 	{
 		// Maybe we don't need to merge any buckets...
-		if (distroMap.size() <= maxSamples)
+		if (static_cast<int>(distroMap.size()) <= maxSamples)
 		{
 			return;
 		}
@@ -110,7 +110,7 @@ class DiscreteDistribution
 		}
 
 		// Now, while we still have too many samples, and the heap isn't empty, merge buckets
-		while (distroMap.size() > maxSamples && !heap.empty())
+		while (static_cast<int>(distroMap.size()) > maxSamples && !heap.empty())
 		{
 			// Get the pair with the lowest distance between buckets
 			ProbabilityPair* merge = heap.top();
@@ -155,7 +155,7 @@ class DiscreteDistribution
 		}
 
 		// If we still have too many samples, do it again
-		if (distroMap.size() > maxSamples)
+		if (static_cast<int>(distroMap.size()) > maxSamples)
 			resize(distroMap);
 	}
 
@@ -174,7 +174,7 @@ public:
 		}
 
 		double stdDev = error / 2.0;
-		var = pow(stdDev, 2);
+		var = std::pow(stdDev, 2);
 
 		// Create a Discrete Distribution from a gaussian
 		double lower = f;
@@ -296,7 +296,7 @@ public:
 		}
 
 		// Now convolute the uniform distributions
-		for (int i = 1; i < uniforms.size(); i++)
+		for (int i = 1; i < static_cast<int>(uniforms.size()); i++)
 		{
 			uniforms[0] = uniforms[0] * uniforms[i];
 		}
@@ -358,7 +358,7 @@ public:
 		}
 
 		double stdDev = error / 2.0;
-		var = pow(stdDev, 2);
+		var = std::pow(stdDev, 2);
 
 		// Create a Discrete Distribution from a gaussian
 		double lower = f;
