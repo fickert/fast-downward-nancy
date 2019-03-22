@@ -6,6 +6,7 @@
 #include "../task_utils/task_properties.h"
 #include "../utils/system.h"
 #include "util.h"
+#include "DiscreteDistribution.h"
 
 namespace real_time {
 
@@ -56,6 +57,23 @@ RealTimeSearch::RealTimeSearch(const options::Options &opts)
 			const auto node = lookahead_search_space.get_node(state);
 			auto eval_context = EvaluationContext(state, node.get_g(), false, nullptr, false);
 			return eval_context.get_evaluator_value_or_infinity(f_hat_evaluator.get());
+		});
+		break;
+	}
+	case DecisionStrategy::NANCY: {
+		auto f_evaluator = std::make_shared<sum_evaluator::SumEvaluator>(std::vector<std::shared_ptr<Evaluator>>{heuristic, std::make_shared<g_evaluator::GEvaluator>()});
+		auto f_hat_evaluator = create_f_hat_evaluator(heuristic, distance_heuristic, *heuristic_error);
+		decision_strategy = std::make_unique<ScalarDecisionStrategy>(state_registry, [this, f_evaluator, f_hat_evaluator](const StateID &state_id, SearchSpace &lookahead_search_space) {
+			const auto state = state_registry.lookup_state(state_id);
+			const auto node = lookahead_search_space.get_node(state);
+			auto eval_context = EvaluationContext(state, node.get_g(), false, nullptr, false);
+			const auto f = eval_context.get_evaluator_value_or_infinity(f_evaluator.get());
+			const auto f_hat = eval_context.get_evaluator_value_or_infinity(f_hat_evaluator.get());
+			const auto d = eval_context.get_evaluator_value_or_infinity(distance_heuristic.get());
+			if (f == EvaluationResult::INFTY || f_hat == EvaluationResult::INFTY || d == EvaluationResult::INFTY)
+				return EvaluationResult::INFTY;
+			auto distribution = DiscreteDistribution(100, f, f_hat, d, f_hat - f);
+			return static_cast<int>(std::lround(distribution.expectedCost()));
 		});
 		break;
 	}

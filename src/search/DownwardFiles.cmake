@@ -773,6 +773,7 @@ fast_downward_plugin(
         real_time/lookhead_search
         real_time/real_time_search
         real_time/util
+        real_time/DiscreteDistribution
     DEPENDS SEARCH_COMMON
 )
 
