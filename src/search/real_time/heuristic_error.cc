@@ -27,7 +27,8 @@ void HeuristicError::set_expanding_state(const GlobalState &state) {
 void HeuristicError::add_successor(const SearchNode &successor_node, int op_cost) {
 	assert(successor_node.is_open() || successor_node.is_closed());
 	auto eval_context = EvaluationContext(successor_node.get_state(), successor_node.get_g(), true, nullptr);
-	assert(!eval_context.is_evaluator_value_infinite(f_evaluator.get()));
+	if (eval_context.is_evaluator_value_infinite(f_evaluator.get()))
+		return;
 	const auto f_value = eval_context.get_evaluator_value(f_evaluator.get());
 	if (best_successor_value == -1 || f_value < best_successor_value) {
 		best_successor_value = f_value;
