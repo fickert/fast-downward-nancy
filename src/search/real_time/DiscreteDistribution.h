@@ -19,7 +19,7 @@ class DiscreteDistribution
 
 		ProbabilityNode() {}
 
-		ProbabilityNode(double x, double prob) 
+		ProbabilityNode(double x, double prob)
 			: cost(x), probability(prob) {}
 
 		bool operator<(const ProbabilityNode& node) const
@@ -89,7 +89,7 @@ class DiscreteDistribution
 		for (map<double, double>::iterator it = distroMap.begin(); it != distroMap.end(); it++)
 		{
 			ProbabilityNode n(it->first, it->second);
-		
+
 			if (cnt == 0)
 			{
 				cnt++;
@@ -226,7 +226,7 @@ public:
 			distribution.insert(ProbabilityNode(g, 1.0));
 			return;
 		}
-		
+
 		// Create a Discrete Distribution from a gaussian
 		double lower = g;
 		double upper = 1.0 + g;
@@ -248,7 +248,7 @@ public:
 
 			currentX += sampleStepSize;
 		}
-		
+
 		// Normalize the distribution probabilities
 		for (ProbabilityNode& n : tmp)
 		{
@@ -383,7 +383,7 @@ public:
 				prob = 1.0;
 
 			probSum += prob;
-			
+
 			ProbabilityNode node(currentX, prob);
 
 			tmp.push_back(node);
@@ -407,7 +407,7 @@ public:
 		{
 				E += n.cost * n.probability;
 		}
-		
+
 		return E;
 	}
 
@@ -544,6 +544,17 @@ public:
 	}
 
 	set<ProbabilityNode>::iterator end()
+	{
+		return distribution.end();
+	}
+
+
+	set<ProbabilityNode>::const_iterator begin() const
+	{
+		return distribution.begin();
+	}
+
+	set<ProbabilityNode>::const_iterator end() const
 	{
 		return distribution.end();
 	}

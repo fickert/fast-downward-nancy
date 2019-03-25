@@ -7,6 +7,7 @@
 #include "../utils/system.h"
 #include "util.h"
 #include "DiscreteDistribution.h"
+#include "risk_search.h"
 
 namespace real_time {
 
@@ -35,7 +36,8 @@ RealTimeSearch::RealTimeSearch(const options::Options &opts)
 		lookahead_search = std::make_unique<FHatLookaheadSearch>(state_registry, opts.get<int>("lookahead_bound"), heuristic, distance_heuristic, static_cast<bool>(dijkstra_learning), expansion_delay.get(), *heuristic_error);
 		break;
 	case LookaheadSearchMethod::RISK:
-		lookahead_search = std::make_unique<RiskLookaheadSearch>(state_registry, opts.get<int>("lookahead_bound"), heuristic, distance_heuristic, static_cast<bool>(dijkstra_learning), expansion_delay.get(), *heuristic_error);
+		lookahead_search = std::make_unique<RiskLookaheadSearch>(state_registry, opts.get<int>("lookahead_bound"), heuristic, distance_heuristic, static_cast<bool>(dijkstra_learning), expansion_delay.get(), heuristic_error.get());
+		break;
 	default:
 		std::cerr << "unknown lookahead search method: " << opts.get_enum("lookahead_search") << std::endl;
 		utils::exit_with(utils::ExitCode::SEARCH_INPUT_ERROR);
