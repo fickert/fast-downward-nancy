@@ -226,24 +226,23 @@ namespace real_time
 
   void RiskLookaheadSearch::backup_beliefs()
   {
-    // Originally, this function sets the k best nodes for each tla.
-    // These k best nodes are then used during the decision phase.
-    // Nothing else changes during the backup (!).  We don't use
-    // kBestNodes in the decision phase, we don't even store them per
-    // TLA.  So, backup_beliefs doesn't really do anything.
+    for (uint tla_id = 0; tla_id < tlas.size(); ++tla_id) {
+      // this while loop just loops until it finds a state in the open
+      // list that is owned by the tla
+      while (1) {
+        if (tlas.open_lists[tla_id]->empty())
+          break;
 
-    // for (uint i = 0; i < tlas.size(); ++i) {
-    //   auto open_list = tlas.open_lists[i];
-    //   while (1) {
-    //     if (open_list.empty())
-    //       break;
-
-    //     auto state_id = open_list->remove_min();
-    //     if (state_owned_by_tla(state_owner, state_id, tla_id)) {
-    //       DiscreteDistribution best = node_belief(search_space->get_node(state_registry.lookup_state(state_id)));
-    //     }
-    //   }
-    // }
+        auto state_id = tlas.open_lists[tla_id]->remove_min();
+        if (state_owned_by_tla(state_owner, state_id, tla_id)) {
+          // kbestDecision with k = 1 just computes this one
+          // distribution and will consequently use just that as the
+          // tla's new belief
+          tlas.beliefs[tla_id] = node_belief(search_space->get_node(state_registry.lookup_state(state_id)));
+          tlas.expected_min_costs[tla_id] = tlas.beliefs[tla_id].expectedCost();
+        }
+      }
+    }
   }
 
   SearchStatus RiskLookaheadSearch::search()
