@@ -59,7 +59,8 @@ namespace real_time
     assert(ops.size() == open_lists.size() &&
            ops.size() == beliefs.size() &&
            ops.size() == expected_min_costs.size() &&
-           ops.size() == states.size());
+           ops.size() == states.size() &&
+           ops.size() == eval_contexts.size());
     return ops.size();
   }
 
@@ -70,6 +71,7 @@ namespace real_time
     beliefs.clear();
     expected_min_costs.clear();
     states.clear();
+    eval_contexts.clear();
   }
 
   void TLAs::reserve(uint n)
@@ -79,6 +81,7 @@ namespace real_time
     beliefs.reserve(n);
     expected_min_costs.reserve(n);
     states.reserve(n);
+    eval_contexts.reserve(n);
   }
 
   void RiskLookaheadSearch::generate_tlas(GlobalState const &current_state)
@@ -105,8 +108,14 @@ namespace real_time
       tlas.beliefs.push_back(node_belief(succ_node));
       tlas.expected_min_costs.push_back(tlas.beliefs.back().expectedCost());
 
-      // add the node of the tla
+      // add the state of the tla
       tlas.states.push_back(succ_state.get_id());
+
+      // add the context for the tla's state
+      tlas.eval_contexts.emplace_back(succ_state,
+                                      search_space->get_node(succ_state).get_g(),
+                                      false,
+                                      statistics.get());
     }
   }
 
@@ -149,21 +158,8 @@ namespace real_time
   }
 
   // select the tla with the minimal expected risk
-  uint RiskLookaheadSearch::select_tla() const
+  uint RiskLookaheadSearch::select_tla()
   {
-    // TODO: not sure if this is smart, setting up all these eval
-    // contexts just to do the risk tie breaking, especially since we
-    // don't reuse them.  maybe there's a smarter way.
-    std::vector<EvaluationContext> eval_contexts;
-    eval_contexts.reserve(tlas.size());
-    for (uint i = 0; i < tlas.size(); ++i) {
-      auto state = state_registry.lookup_state(tlas.states[i]);
-      eval_contexts.emplace_back(state,
-                                 search_space->get_node(state).get_g(),
-                                 false,
-                                 statistics.get());
-    }
-
     uint res = 0;
     double min_risk = numeric_limits<double>::infinity();
 
@@ -194,8 +190,8 @@ namespace real_time
         min_risk = risk;
         res = i;
       } else if (risk == min_risk) {
-        auto &eval_context = eval_contexts[i];
-        auto &min_eval_context = eval_contexts[res];
+        auto &eval_context = tlas.eval_contexts[i];
+        auto &min_eval_context = tlas.eval_contexts[res];
         int min_f_hat = min_eval_context.get_evaluator_value_or_infinity(f_hat_evaluator.get());
         int f_hat = eval_context.get_evaluator_value_or_infinity(f_hat_evaluator.get());
         if (f_hat < min_f_hat) {
@@ -233,13 +229,19 @@ namespace real_time
         if (tlas.open_lists[tla_id]->empty())
           break;
 
+        // remove the best state from open
         auto state_id = tlas.open_lists[tla_id]->remove_min();
         if (state_owned_by_tla(state_owner, state_id, tla_id)) {
           // kbestDecision with k = 1 just computes this one
           // distribution and will consequently use just that as the
           // tla's new belief
-          tlas.beliefs[tla_id] = node_belief(search_space->get_node(state_registry.lookup_state(state_id)));
+          auto best_state = state_registry.lookup_state(state_id);
+          auto best_node = search_space->get_node(best_state);
+          tlas.beliefs[tla_id] = node_belief(best_node);
           tlas.expected_min_costs[tla_id] = tlas.beliefs[tla_id].expectedCost();
+          auto eval_context = EvaluationContext(best_state, best_node.get_g(), false, statistics.get());
+          // insert the best node back into open
+          tlas.open_lists[tla_id]->insert(eval_context, tlas.states[tla_id]);
         }
       }
     }

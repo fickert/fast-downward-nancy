@@ -35,7 +35,12 @@ namespace real_time
          a1   a2  a3 ...
         /     |     \
        n1    n2     n3 ...
-     */
+    */
+
+    // TODO: not sure if this is smart, setting up all these eval
+    // contexts
+    std::vector<EvaluationContext> eval_contexts;
+
 
     void reserve(uint n);
     void clear();
@@ -63,7 +68,7 @@ namespace real_time
     void generate_tlas(GlobalState const &current_state);
     std::unique_ptr<StateOpenList> create_open_list() const;
     double risk_analysis(uint const alpha) const;
-    uint select_tla() const;
+    uint select_tla();
     void backup_beliefs();
     DiscreteDistribution node_belief(SearchNode const &);
   public:
