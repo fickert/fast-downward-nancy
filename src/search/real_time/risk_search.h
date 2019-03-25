@@ -38,6 +38,17 @@ namespace real_time
     std::shared_ptr<Evaluator> f_hat_evaluator;
     std::shared_ptr<Evaluator> heuristic;
     TLAs tlas;
+    
+    // stores the index of the tla that owns the state
+    // this is a hack to detect and prevent a state being expanded
+    // under a tla when there is a different tla that has a shorter
+    // path to that state.
+    std::unordered_map<StateID, int> state_owner;
+
+    // This is storage for applicable operators
+    // It's kept here in the class because clearing a vector is
+    // more efficient than creating a new one each iteration
+    std::vector<OperatorID> applicables;
   public:
     RiskLookaheadSearch(StateRegistry &state_registry,
                         int lookahead_bound,

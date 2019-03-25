@@ -45,9 +45,6 @@ namespace real_time
       auto const succ_state = state_registry.get_successor_state(current_state, op);
       auto succ_node = search_space->get_node(succ_state);
 
-      // add the operator
-      ops.push_back(op_id);
-
       // add the node to the global open list and to this tla's open list
       open_lists.push_back(create_open_list());
       auto eval_context = EvaluationContext(succ_state, 0, false, statistics.get());
@@ -80,9 +77,46 @@ namespace real_time
     closed.insert(search_space->get_node(initial_state));
   }
 
+  double RiskLookaheadSearch::risk_analysis()
+  {
+    return 0;
+  }
+
+  // select the tla with the minimal expected risk
+  int RiskLookaheadSearch::select_tla()
+  {
+    int res = 0;
+    double min_risk = numeric_limits<double>::infinity();
+
+    int alpha = 0;
+    //double alpha_cost = tlas.beliefs[0].expectedCost();
+    double alpha_cost = tlas.costs[0];
+
+    for (int i = 1; i < tlas.costs.size(); ++i) {
+      if (tlas.costs[i] < alpha_cost) {
+        alpha_cost = tlas.costs[i];
+        alpha = i;
+      }
+    }
+
+    for (int i = 0; i < tlas.costs.size(); ++i) {
+      if (tlas.open_lists[i].empty()) {
+        continue;
+      }
+      // TODO: risk analysis
+      double risk = 0.0;
+      if (risk < min_risk) {
+        min_risk = risk;
+        res = i;
+      }
+    }
+    return res;
+  }
+
   SearchStatus RiskLookaheadSearch::search()
   {
     assert(statistics);
+    state_owner.clear();
     while (statistics->getexpanded() < lookahead_bound) {
       if (open_list->empty())
         return FAILED;
@@ -91,31 +125,102 @@ namespace real_time
       // check if the beliefs of all tlas really need to be updated each time.
       // maybe it depends on the backup strategy, but I don't think it's necessary for nancy.
       int tla_id = select_tla();
-      auto state_id = tlas.open_lists[tla_id].remove_min();
+      auto &open_list = tlas.open_lists[tla_id];
+      auto state_id = open_list.remove_min();
+      const auto owner = state_owner.find(state_id);
+      if (owner == state_owner::end()) {
+        // this should never happen
+        // TODO: print error
+        continue;
+      }
+      if (owner->second != tla_id) {
+        // this might happen
+        continue;
+      }
+
       // Problem: here we need to remove this specific node from the global open list
+      //
       auto state = state_registry.lookup_state(state_id);
       auto node = search_space->get_node(state);
 
+      if (node.is_closed()) {
+        continue;
+      }
+
       mark_expanded(node);
-      // TODO: also remember which tla expanded this node
+      state_owner[node] = tla_id;
 
-      if (check_goal_and_set_plan(state))
+      if (check_goal_and_set_plan(state)) {
         return SOLVED;
+      }
 
-      // TODO:
-      // 1. simulate exapnsion under each tla to select minimum risk tla.
-      // 2. select node from the open list of that tla.
-      // 3. check for goal.
-      // 4. remove node from global open, and tla open, (also increment expansio statistics).
-      // 5. generate successor nodes, do duplicate detection.
-      //    if this node is open, but another tla closed a node for that state before, keep better g value.
-      //    Problem: We have to remove this specific node from the open list of the other tla.
-      //    if the node is closed, proceed as usual, compare the f values and reopen it.
-      //    if the node is new, just evaluate it and add it to open.
+      applicables.clear();
+      successor_generator.generate_applicable_ops(state, applicables);
+      auto eval_context = EvaluationContext(state, node.get_g(), false, statistics.get());
+      if (heuristic_error)
+        heuristic_error->set_expanding_state(state);
 
+      for (auto op_id : applicables) {
+        const auto op = task_proxy.get_operators()[op_id];
+        const auto succ_state = state_registry.get_successor_state(state, op);
+        statistics->inc_generated();
+        auto succ_node = search_space->get_node(succ_state);
 
-      // (there's also something in the end to learn the one-step error. I'm not sure yet what that's about exactly).
+        if (store_exploration_data)
+          predecessors[succ_state.get_id()].emplace_back(id, op);
 
+        if (succ_node.is_dead_end())
+          continue;
+
+        if (succ_node.is_new()) {
+          auto succ_eval_context = EvaluationContext(succ_state, node.get_g() + op.get_cost(), false, statistics.get());
+          statistics->inc_evaluated_states();
+          if (open_list->is_dead_end(succ_eval_context)) {
+            succ_node.mark_as_dead_end();
+            statistics->inc_dead_ends();
+            continue;
+          }
+          succ_node.open(node, op, op.get_cost());
+          open_list->insert(succ_eval_context, succ_state.get_id());
+          state_owner[succ_state] = tla_id;
+        } else if (succ_node.get_g() > node.get_g() + op.get_cost()) {
+          // We found a new cheapest path to an open or closed state.
+          if (succ_node.is_closed())
+            statistics->inc_reopened();
+          succ_node.reopen(node, op, op.get_cost());
+          auto succ_eval_context = EvaluationContext(succ_state, succ_node.get_g(), false, statistics.get());
+          open_list->insert(succ_eval_context, succ_state.get_id());
+          state_owner[succ_state] = tla_id;
+        }
+
+        open_list_insertion_time[id] = statistics->get_expanded();
+        if (heuristic_error)
+          heuristic_error->add_successor(succ_node, op.get_cost());
+      }
+      if (heuristic_error)
+        heuristic_error->update_error();
+    }
+
+    // collect the frontiers of all tlas
+    for (int i = 0; i < open_lists.size(); ++i) {
+      auto &open_list = open_lists[i];
+      while (!open_list->empty()) {
+        StateId state_id = open_list->remove_min();
+        auto find = state_owner.find(state_id);
+        if (find == state_owner::end()) {
+          // this shouldn't happen
+          // TODO: print error
+          continue;
+        }
+        if (find->second != i) {
+          continue;
+        }
+        frontier.push_back(state_id);
+      }
+    }
+    return IN_PROGRESS;
+
+    // (there's also something in the end to learn the one-step error. I'm not sure yet what that's about exactly).
     }
   }
 
@@ -128,6 +233,7 @@ namespace real_time
       heuristic(heuristic)
   {
     tlas.reserve(32);
+    applicables.reserve(32);
   }
 
 
