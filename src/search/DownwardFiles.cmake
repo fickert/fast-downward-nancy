@@ -774,6 +774,7 @@ fast_downward_plugin(
         real_time/real_time_search
         real_time/util
         real_time/DiscreteDistribution
+        real_time/risk_search
     DEPENDS SEARCH_COMMON
 )
 

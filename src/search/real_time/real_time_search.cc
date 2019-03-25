@@ -34,6 +34,8 @@ RealTimeSearch::RealTimeSearch(const options::Options &opts)
 	case LookaheadSearchMethod::F_HAT:
 		lookahead_search = std::make_unique<FHatLookaheadSearch>(state_registry, opts.get<int>("lookahead_bound"), heuristic, distance_heuristic, static_cast<bool>(dijkstra_learning), expansion_delay.get(), *heuristic_error);
 		break;
+	case LookaheadSearchMethod::RISK:
+		lookahead_search = std::make_unique<RiskLookaheadSearch>(state_registry, opts.get<int>("lookahead_bound"), heuristic, distance_heuristic, static_cast<bool>(dijkstra_learning), expansion_delay.get(), *heuristic_error);
 	default:
 		std::cerr << "unknown lookahead search method: " << opts.get_enum("lookahead_search") << std::endl;
 		utils::exit_with(utils::ExitCode::SEARCH_INPUT_ERROR);
@@ -72,6 +74,8 @@ RealTimeSearch::RealTimeSearch(const options::Options &opts)
 			const auto d = eval_context.get_evaluator_value_or_infinity(distance_heuristic.get());
 			if (f == EvaluationResult::INFTY || f_hat == EvaluationResult::INFTY || d == EvaluationResult::INFTY)
 				return EvaluationResult::INFTY;
+			// Note: Maybe it would be convenient to store the distribution per node
+			// since we could already use them in the lookahead stage
 			auto distribution = DiscreteDistribution(100, f, f_hat, d, f_hat - f);
 			return static_cast<int>(std::lround(distribution.expectedCost()));
 		});
