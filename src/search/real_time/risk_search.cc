@@ -99,23 +99,27 @@ namespace real_time
       auto const op = task_proxy.get_operators()[op_id];
       auto const succ_state = state_registry.get_successor_state(current_state, op);
       auto succ_node = search_space->get_node(succ_state);
+      auto insert_node = true;
       if (succ_node.is_new())
         succ_node.open(root_node, op, op.get_cost());
       else if (op.get_cost() < succ_node.get_g())
         succ_node.reopen(root_node, op, op.get_cost());
       else
-        continue;
+        insert_node = false;
 
       // add the node to this tla's open list
       tlas.open_lists.push_back(create_open_list());
       // add the context for the tla's state
       tlas.eval_contexts.emplace_back(succ_state, succ_node.get_g(), false, statistics.get());
       auto &eval_context = tlas.eval_contexts.back();
-      tlas.open_lists.back()->insert(eval_context, succ_state.get_id());
-      if (expansion_delay) {
-        open_list_insertion_time[succ_state.get_id()] = 0;
+
+      if (insert_node) {
+        tlas.open_lists.back()->insert(eval_context, succ_state.get_id());
+        if (expansion_delay) {
+          open_list_insertion_time[succ_state.get_id()] = 0;
+        }
+        state_owner[succ_state.get_id()] = i;
       }
-      state_owner[succ_state.get_id()] = i;
 
       // add the belief (and expected value)
       tlas.beliefs.push_back(node_belief(succ_node));
