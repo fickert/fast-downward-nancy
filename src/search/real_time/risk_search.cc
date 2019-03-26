@@ -89,6 +89,8 @@ namespace real_time
   {
     tlas.clear();
     state_owner.clear();
+    if (heuristic_error)
+      heuristic_error->set_expanding_state(current_state);
     successor_generator.generate_applicable_ops(current_state, tlas.ops);
     auto root_node = search_space->get_node(current_state);
 
@@ -97,7 +99,12 @@ namespace real_time
       auto const op = task_proxy.get_operators()[op_id];
       auto const succ_state = state_registry.get_successor_state(current_state, op);
       auto succ_node = search_space->get_node(succ_state);
-      succ_node.open(root_node, op, op.get_cost());
+      if (succ_node.is_new())
+        succ_node.open(root_node, op, op.get_cost());
+      else if (op.get_cost() < succ_node.get_g())
+        succ_node.reopen(root_node, op, op.get_cost());
+      else
+        continue;
 
       // add the node to this tla's open list
       tlas.open_lists.push_back(create_open_list());
@@ -117,9 +124,12 @@ namespace real_time
       // add the state of the tla
       tlas.states.push_back(succ_state.get_id());
 
-      // TODO: update heuristic error
+      if (heuristic_error)
+        heuristic_error->add_successor(succ_node, op.get_cost());
     }
     root_node.close();
+    if (heuristic_error)
+      heuristic_error->update_error();
   }
 
   void RiskLookaheadSearch::initialize(const GlobalState &initial_state)
@@ -181,12 +191,7 @@ namespace real_time
       if (tlas.open_lists[i]->empty()) {
         continue;
       }
-      // TODO: there is something missing here.  andrew does some
-      // squishing before the risk analysis.  Not quite sure how that
-      // works.  In particular it requires knowledge about the
-      // "average delay window"?
       assert(expansion_delay);
-
       // Simulate how expanding this TLA's best node would affect its belief
       // Belief of TLA is squished as a result of search. Mean stays the same, but variance is decreased by a factor based on expansion delay.
       double ds = 1 / expansion_delay->get_avg_expansion_delay();
@@ -248,8 +253,8 @@ namespace real_time
           break;
         }
 
-        // remove the best state from open
-        auto state_id = tlas.open_lists[tla_id]->remove_min();
+        // get the best state from open
+        auto state_id = tlas.open_lists[tla_id]->top();
         if (state_owned_by_tla(state_owner, state_id, tla_id)) {
           // kbestDecision with k = 1 just computes this one
           // distribution and will consequently use just that as the
@@ -258,10 +263,9 @@ namespace real_time
           auto best_node = search_space->get_node(best_state);
           tlas.beliefs[tla_id] = node_belief(best_node);
           tlas.expected_min_costs[tla_id] = tlas.beliefs[tla_id].expectedCost();
-          auto eval_context = EvaluationContext(best_state, best_node.get_g(), false, statistics.get());
-          // insert the best node back into open
-          tlas.open_lists[tla_id]->insert(eval_context, tlas.states[tla_id]);
           break;
+        } else {
+          tlas.open_lists[tla_id]->remove_min();
         }
       }
     }
