@@ -136,7 +136,7 @@ namespace real_time
       closed.emplace(initial_state.get_id());
   }
 
-  double RiskLookaheadSearch::risk_analysis(size_t const alpha) const
+  double RiskLookaheadSearch::risk_analysis(size_t const alpha, const vector<DiscreteDistribution> &squished_beliefs) const
   {
     double risk = 0.0;
 
@@ -145,11 +145,11 @@ namespace real_time
     // integrate over probability nodes in beta's belief
     // add to risk if beta cost is smaller than alpha cost
     // => risk is proportional to the chance that alpha isn't the optimal choice
-    for (auto const &a : tlas.beliefs[alpha]) {
+    for (auto const &a : squished_beliefs[alpha]) {
       for (size_t beta = 0; beta < tlas.size(); ++beta) {
         if (alpha == beta)
           continue;
-        for (auto const &b : tlas.beliefs[beta]) {
+        for (auto const &b : squished_beliefs[beta]) {
           if (b.cost < a.cost)
             risk += a.probability * b.probability * (a.cost - b.cost);
           else
@@ -185,7 +185,21 @@ namespace real_time
       // squishing before the risk analysis.  Not quite sure how that
       // works.  In particular it requires knowledge about the
       // "average delay window"?
-      double risk = risk_analysis(alpha);
+      assert(expansion_delay);
+
+      // Simulate how expanding this TLA's best node would affect its belief
+      // Belief of TLA is squished as a result of search. Mean stays the same, but variance is decreased by a factor based on expansion delay.
+      double ds = 1 / expansion_delay->get_avg_expansion_delay();
+      auto best_state_id = tlas.open_lists[i]->top();
+      auto best_state_eval_context = EvaluationContext(state_registry.lookup_state(best_state_id), -1, false, nullptr);
+      assert(!best_state_eval_context.is_evaluator_value_infinite(distance_heuristic.get()));
+      double dy = best_state_eval_context.get_evaluator_value(distance_heuristic.get());
+      double squishFactor = min(1.0, (ds / dy));
+
+      auto squished_beliefs = tlas.beliefs;
+      squished_beliefs[i].squish(squishFactor);
+
+      double risk = risk_analysis(alpha, squished_beliefs);
 
       // keep the minimum risk tla.
       // otherwise tie-break f_hat -> f -> g
@@ -229,8 +243,10 @@ namespace real_time
       // this while loop just loops until it finds a state in the open
       // list that is owned by the tla
       while (1) {
-        if (tlas.open_lists[tla_id]->empty())
+        if (tlas.open_lists[tla_id]->empty()) {
+          tlas.expected_min_costs[tla_id] = numeric_limits<double>::infinity();
           break;
+        }
 
         // remove the best state from open
         auto state_id = tlas.open_lists[tla_id]->remove_min();
@@ -245,6 +261,7 @@ namespace real_time
           auto eval_context = EvaluationContext(best_state, best_node.get_g(), false, statistics.get());
           // insert the best node back into open
           tlas.open_lists[tla_id]->insert(eval_context, tlas.states[tla_id]);
+          break;
         }
       }
     }

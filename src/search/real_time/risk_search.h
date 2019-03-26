@@ -67,7 +67,7 @@ namespace real_time
   protected:
     void generate_tlas(GlobalState const &current_state);
     std::unique_ptr<StateOpenList> create_open_list() const;
-    double risk_analysis(std::size_t const alpha) const;
+    double risk_analysis(std::size_t const alpha, const vector<DiscreteDistribution> &squished_beliefs) const;
     std::size_t select_tla();
     void backup_beliefs();
     DiscreteDistribution node_belief(SearchNode const &);
