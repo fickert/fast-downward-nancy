@@ -28,6 +28,7 @@ namespace real_time
   {
     const auto owner = state_owner.find(state_id);
     if (owner == state_owner.end()) {
+      assert(false);
       // this should never happen
       // TODO: print error
       return false;
@@ -87,17 +88,22 @@ namespace real_time
   void RiskLookaheadSearch::generate_tlas(GlobalState const &current_state)
   {
     tlas.clear();
+    state_owner.clear();
     successor_generator.generate_applicable_ops(current_state, tlas.ops);
+    auto root_node = search_space->get_node(current_state);
 
     for (size_t i = 0; i < tlas.ops.size(); ++i) {
       auto op_id = tlas.ops[i];
       auto const op = task_proxy.get_operators()[op_id];
       auto const succ_state = state_registry.get_successor_state(current_state, op);
       auto succ_node = search_space->get_node(succ_state);
+      succ_node.open(root_node, op, op.get_cost());
 
       // add the node to this tla's open list
       tlas.open_lists.push_back(create_open_list());
-      auto eval_context = EvaluationContext(succ_state, 0, false, statistics.get());
+      // add the context for the tla's state
+      tlas.eval_contexts.emplace_back(succ_state, succ_node.get_g(), false, statistics.get());
+      auto &eval_context = tlas.eval_contexts.back();
       tlas.open_lists.back()->insert(eval_context, succ_state.get_id());
       if (expansion_delay) {
         open_list_insertion_time[succ_state.get_id()] = 0;
@@ -111,12 +117,9 @@ namespace real_time
       // add the state of the tla
       tlas.states.push_back(succ_state.get_id());
 
-      // add the context for the tla's state
-      tlas.eval_contexts.emplace_back(succ_state,
-                                      search_space->get_node(succ_state).get_g(),
-                                      false,
-                                      statistics.get());
+      // TODO: update heuristic error
     }
+    root_node.close();
   }
 
   void RiskLookaheadSearch::initialize(const GlobalState &initial_state)
@@ -250,7 +253,6 @@ namespace real_time
   SearchStatus RiskLookaheadSearch::search()
   {
     assert(statistics);
-    state_owner.clear();
     while (statistics->get_expanded() < lookahead_bound) {
 
       // setup work: find tla to expand under
