@@ -48,6 +48,7 @@ public:
     virtual ~ParetoOpenList() override = default;
 
     virtual Entry remove_min() override;
+    virtual Entry top() override;
     virtual bool empty() const override;
     virtual void clear() override;
     virtual void get_path_dependent_evaluators(set<Evaluator *> &evals) override;
@@ -177,6 +178,12 @@ Entry ParetoOpenList<Entry>::remove_min() {
     if (bucket.empty())
         remove_key(*selected);
     return result;
+}
+
+template<class Entry>
+Entry ParetoOpenList<Entry>::top() {
+    std::cerr << "ParetoOpenList::top() is not implemented." << std::endl;
+    utils::exit_with(utils::ExitCode::SEARCH_CRITICAL_ERROR);
 }
 
 template<class Entry>

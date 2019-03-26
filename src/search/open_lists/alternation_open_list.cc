@@ -30,6 +30,7 @@ public:
     virtual ~AlternationOpenList() override = default;
 
     virtual Entry remove_min() override;
+    virtual Entry top() override;
     virtual bool empty() const override;
     virtual void clear() override;
     virtual void boost_preferred() override;
@@ -75,6 +76,12 @@ Entry AlternationOpenList<Entry>::remove_min() {
     assert(!best_list->empty());
     ++priorities[best];
     return best_list->remove_min();
+}
+
+template<class Entry>
+Entry AlternationOpenList<Entry>::top() {
+    std::cerr << "AlternationOpenList::top() is not implemented." << std::endl;
+    utils::exit_with(ExitCode::SEARCH_CRITICAL_ERROR);
 }
 
 template<class Entry>

@@ -38,6 +38,7 @@ public:
     virtual ~TypeBasedOpenList() override = default;
 
     virtual Entry remove_min() override;
+    virtual Entry top() override;
     virtual bool empty() const override;
     virtual void clear() override;
     virtual bool is_dead_end(EvaluationContext &eval_context) const override;
@@ -89,6 +90,12 @@ Entry TypeBasedOpenList<Entry>::remove_min() {
         utils::swap_and_pop_from_vector(keys_and_buckets, bucket_id);
     }
     return result;
+}
+
+template<class Entry>
+Entry TypeBasedOpenList<Entry>::top() {
+    std::cerr << "TypeBasedOpenList::top() is not implemented." << std::endl;
+    utils::exit_with(utils::ExitCode::SEARCH_CRITICAL_ERROR);
 }
 
 template<class Entry>

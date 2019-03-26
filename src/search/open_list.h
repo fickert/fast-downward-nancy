@@ -52,6 +52,11 @@ public:
     */
     virtual Entry remove_min() = 0;
 
+    /*
+      Return the entry that should be expanded next.
+    */
+    virtual Entry top() = 0;
+
     // Return true if the open list is empty.
     virtual bool empty() const = 0;
 

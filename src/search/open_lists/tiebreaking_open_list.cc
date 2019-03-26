@@ -42,6 +42,7 @@ public:
     virtual ~TieBreakingOpenList() override = default;
 
     virtual Entry remove_min() override;
+    virtual Entry top() override;
     virtual bool empty() const override;
     virtual void clear() override;
     virtual void get_path_dependent_evaluators(set<Evaluator *> &evals) override;
@@ -84,6 +85,16 @@ Entry TieBreakingOpenList<Entry>::remove_min() {
     if (it->second.empty())
         buckets.erase(it);
     return result;
+}
+
+template<class Entry>
+Entry TieBreakingOpenList<Entry>::top() {
+    assert(size > 0);
+    typename map<const vector<int>, Bucket>::iterator it;
+    it = buckets.begin();
+    assert(it != buckets.end());
+    assert(!it->second.empty());
+    return it->second.front();
 }
 
 template<class Entry>
