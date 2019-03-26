@@ -42,7 +42,7 @@ namespace real_time
     std::vector<EvaluationContext> eval_contexts;
 
 
-    void reserve(uint n);
+    void reserve(std::size_t n);
     void clear();
     size_t size() const;
   };
@@ -67,8 +67,8 @@ namespace real_time
   protected:
     void generate_tlas(GlobalState const &current_state);
     std::unique_ptr<StateOpenList> create_open_list() const;
-    double risk_analysis(uint const alpha) const;
-    uint select_tla();
+    double risk_analysis(std::size_t const alpha) const;
+    std::size_t select_tla();
     void backup_beliefs();
     DiscreteDistribution node_belief(SearchNode const &);
   public:

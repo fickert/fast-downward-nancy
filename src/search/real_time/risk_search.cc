@@ -74,7 +74,7 @@ namespace real_time
     eval_contexts.clear();
   }
 
-  void TLAs::reserve(uint n)
+  void TLAs::reserve(size_t n)
   {
     ops.reserve(n);
     open_lists.reserve(n);
@@ -89,7 +89,7 @@ namespace real_time
     tlas.clear();
     successor_generator.generate_applicable_ops(current_state, tlas.ops);
 
-    for (uint i = 0; i < tlas.ops.size(); ++i) {
+    for (size_t i = 0; i < tlas.ops.size(); ++i) {
       auto op_id = tlas.ops[i];
       auto const op = task_proxy.get_operators()[op_id];
       auto const succ_state = state_registry.get_successor_state(current_state, op);
@@ -133,7 +133,7 @@ namespace real_time
       closed.emplace(initial_state.get_id());
   }
 
-  double RiskLookaheadSearch::risk_analysis(uint const alpha) const
+  double RiskLookaheadSearch::risk_analysis(size_t const alpha) const
   {
     double risk = 0.0;
 
@@ -143,7 +143,7 @@ namespace real_time
     // add to risk if beta cost is smaller than alpha cost
     // => risk is proportional to the chance that alpha isn't the optimal choice
     for (auto const &a : tlas.beliefs[alpha]) {
-      for (uint beta = 0; beta < tlas.size(); ++beta) {
+      for (size_t beta = 0; beta < tlas.size(); ++beta) {
         if (alpha == beta)
           continue;
         for (auto const &b : tlas.beliefs[beta]) {
@@ -158,23 +158,23 @@ namespace real_time
   }
 
   // select the tla with the minimal expected risk
-  uint RiskLookaheadSearch::select_tla()
+  size_t RiskLookaheadSearch::select_tla()
   {
-    uint res = 0;
+    size_t res = 0;
     double min_risk = numeric_limits<double>::infinity();
 
-    uint alpha = 0;
+    size_t alpha = 0;
     //double alpha_cost = tlas.beliefs[0].expectedCost();
     double alpha_cost = tlas.expected_min_costs[0];
 
-    for (uint i = 1; i < tlas.size(); ++i) {
+    for (size_t i = 1; i < tlas.size(); ++i) {
       if (tlas.expected_min_costs[i] < alpha_cost) {
         alpha_cost = tlas.expected_min_costs[i];
         alpha = i;
       }
     }
 
-    for (uint i = 0; i < tlas.size(); ++i) {
+    for (size_t i = 0; i < tlas.size(); ++i) {
       if (tlas.open_lists[i]->empty()) {
         continue;
       }
@@ -222,7 +222,7 @@ namespace real_time
 
   void RiskLookaheadSearch::backup_beliefs()
   {
-    for (uint tla_id = 0; tla_id < tlas.size(); ++tla_id) {
+    for (size_t tla_id = 0; tla_id < tlas.size(); ++tla_id) {
       // this while loop just loops until it finds a state in the open
       // list that is owned by the tla
       while (1) {
@@ -331,7 +331,7 @@ namespace real_time
     }
 
     // collect the frontiers of all tlas
-    for (uint i = 0; i < tlas.open_lists.size(); ++i) {
+    for (size_t i = 0; i < tlas.open_lists.size(); ++i) {
       while (!tlas.open_lists[i]->empty()) {
         StateID state_id = tlas.open_lists[i]->remove_min();
         if (state_owned_by_tla(state_owner, state_id, i))
