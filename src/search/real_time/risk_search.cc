@@ -50,8 +50,11 @@ namespace real_time
   {
     auto eval_context = EvaluationContext(node.get_state(), node.get_g(), false, nullptr, false);
     const auto f = eval_context.get_evaluator_value_or_infinity(heuristic.get());
+    assert(f != EvaluationResult::INFTY);
     const auto f_hat = eval_context.get_evaluator_value_or_infinity(f_hat_evaluator.get());
+    assert(f_hat != EvaluationResult::INFTY);
     const auto d = eval_context.get_evaluator_value_or_infinity(distance_heuristic.get());
+    assert(d != EvaluationResult::INFTY);
     return DiscreteDistribution(100, f, f_hat, d, f_hat - f);
   }
 
@@ -91,35 +94,41 @@ namespace real_time
     state_owner.clear();
     if (heuristic_error)
       heuristic_error->set_expanding_state(current_state);
-    successor_generator.generate_applicable_ops(current_state, tlas.ops);
+    auto ops = std::vector<OperatorID>();
+    successor_generator.generate_applicable_ops(current_state, ops);
     auto root_node = search_space->get_node(current_state);
 
-    for (size_t i = 0; i < tlas.ops.size(); ++i) {
-      auto op_id = tlas.ops[i];
+    for (auto op_id : ops) {
       auto const op = task_proxy.get_operators()[op_id];
       auto const succ_state = state_registry.get_successor_state(current_state, op);
       auto succ_node = search_space->get_node(succ_state);
-      auto insert_node = true;
       if (succ_node.is_new())
         succ_node.open(root_node, op, op.get_cost());
       else if (op.get_cost() < succ_node.get_g())
         succ_node.reopen(root_node, op, op.get_cost());
       else
-        insert_node = false;
+        continue;
+
+      auto eval_context = EvaluationContext(succ_state, succ_node.get_g(), false, statistics.get());
+      if (eval_context.is_evaluator_value_infinite(heuristic.get()) || eval_context.is_evaluator_value_infinite(distance_heuristic.get())) {
+        succ_node.mark_as_dead_end();
+        statistics->inc_dead_ends();
+        continue;
+      }
+
+      tlas.ops.push_back(op_id);
 
       // add the node to this tla's open list
       tlas.open_lists.push_back(create_open_list());
-      // add the context for the tla's state
-      tlas.eval_contexts.emplace_back(succ_state, succ_node.get_g(), false, statistics.get());
-      auto &eval_context = tlas.eval_contexts.back();
+      tlas.open_lists.back()->insert(eval_context, succ_state.get_id());
 
-      if (insert_node) {
-        tlas.open_lists.back()->insert(eval_context, succ_state.get_id());
-        if (expansion_delay) {
-          open_list_insertion_time[succ_state.get_id()] = 0;
-        }
-        state_owner[succ_state.get_id()] = i;
+      // add the context for the tla's state
+      tlas.eval_contexts.emplace_back(std::move(eval_context));
+
+      if (expansion_delay) {
+        open_list_insertion_time[succ_state.get_id()] = 0;
       }
+      state_owner[succ_state.get_id()] = static_cast<int>(tlas.ops.size()) - 1;
 
       // add the belief (and expected value)
       tlas.beliefs.push_back(node_belief(succ_node));
