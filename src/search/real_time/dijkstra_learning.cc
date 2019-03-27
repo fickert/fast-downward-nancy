@@ -43,7 +43,6 @@ void DijkstraLearning::apply_updates(const std::unordered_map<StateID, std::vect
 	using LearningQueueType = std::pair<int, StateID>;
 	auto learning_queue = std::priority_queue<LearningQueueType, std::vector<LearningQueueType>, decltype(learning_queue_compare)>(learning_queue_compare);
 
-	assert(!frontier.empty());
 	for (const auto &state_id : frontier) {
 		auto state = state_registry.lookup_state(state_id);
 		assert(learning_evaluator->is_estimate_cached(state));
