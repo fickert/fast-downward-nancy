@@ -764,6 +764,7 @@ fast_downward_plugin(
     NAME REAL_TIME
     HELP "Real-time search"
     SOURCES
+        real_time/astar_solve_all
         real_time/debiased_heuristic
         real_time/decision_strategy
         real_time/dijkstra_learning
