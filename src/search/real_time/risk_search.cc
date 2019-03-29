@@ -45,13 +45,18 @@ namespace real_time
   DiscreteDistribution RiskLookaheadSearch::node_belief(SearchNode const &node)
   {
     auto eval_context = EvaluationContext(node.get_state(), node.get_g(), false, nullptr, false);
+	if (hstar_data) {
+		const auto hstar_data_it = hstar_data->find(eval_context.get_evaluator_value(heuristic.get()));
+		if (hstar_data_it != std::end(*hstar_data))
+			return DiscreteDistribution(MAX_SAMPLES, hstar_data_it->second);
+	}
     const auto f = eval_context.get_evaluator_value_or_infinity(f_evaluator.get());
     assert(f != EvaluationResult::INFTY);
     const auto f_hat = eval_context.get_evaluator_value_or_infinity(f_hat_evaluator.get());
     assert(f_hat != EvaluationResult::INFTY);
     const auto d = eval_context.get_evaluator_value_or_infinity(distance_heuristic.get());
     assert(d != EvaluationResult::INFTY);
-    return DiscreteDistribution(100, f, f_hat, d, f_hat - f);
+    return DiscreteDistribution(MAX_SAMPLES, f, f_hat, d, f_hat - f);
   }
 
   size_t TLAs::size() const
@@ -377,13 +382,14 @@ namespace real_time
 
   RiskLookaheadSearch::RiskLookaheadSearch(StateRegistry &state_registry, int lookahead_bound,
       std::shared_ptr<Evaluator> heuristic, std::shared_ptr<Evaluator> distance,
-      bool store_exploration_data, ExpansionDelay *expansion_delay, HeuristicError *heuristic_error)
+      bool store_exploration_data, ExpansionDelay *expansion_delay, HeuristicError *heuristic_error, hstar_data_type *hstar_data)
     : LookaheadSearch(state_registry, lookahead_bound, store_exploration_data,
                       expansion_delay, heuristic_error),
       f_evaluator(std::make_shared<sum_evaluator::SumEvaluator>(std::vector<std::shared_ptr<Evaluator>>{heuristic, std::make_shared<g_evaluator::GEvaluator>()})),
       f_hat_evaluator(create_f_hat_evaluator(heuristic, distance, *heuristic_error)),
       heuristic(heuristic),
-      distance_heuristic(distance)
+      distance_heuristic(distance),
+      hstar_data(hstar_data)
   {
     tlas.reserve(32);
     applicables.reserve(32);

@@ -1,4 +1,7 @@
 #pragma once
+
+#include "util.h"
+
 #include <cmath>
 #include <vector>
 #include <queue>
@@ -64,7 +67,8 @@ class DiscreteDistribution
 
 	set<ProbabilityNode> distribution;
 	int maxSamples;
-	double var;
+
+	static unordered_map<double, vector<ProbabilityNode>> hValueTable;
 
 	double probabilityDensityFunction(double x, double mu, double var)
 	{
@@ -162,7 +166,7 @@ class DiscreteDistribution
 public:
 
 	DiscreteDistribution() {}
-	DiscreteDistribution(int maxSamples) : maxSamples(maxSamples) {}
+	explicit DiscreteDistribution(int maxSamples) : maxSamples(maxSamples) {}
 	DiscreteDistribution(int maxSamples, double f, double mean, double d, double error)
 		: maxSamples(maxSamples)
 	{
@@ -174,7 +178,7 @@ public:
 		}
 
 		double stdDev = error / 2.0;
-		var = std::pow(stdDev, 2);
+		auto var = std::pow(stdDev, 2);
 
 		// Create a Discrete Distribution from a gaussian
 		double lower = f;
@@ -311,6 +315,12 @@ public:
 		distribution.insert(ProbabilityNode(deltaSpikeValue, 1.0));
 	}
 
+	DiscreteDistribution(int maxSamples, const real_time::hstar_data_entry &hstar_data)
+		: maxSamples(maxSamples) {
+		for (const auto &[hstar_value, count] : hstar_data.hstar_values)
+			distribution.emplace(hstar_value, count / static_cast<double>(hstar_data.value_count));
+	}
+
 	void createFromUniform(int maxSamples, double g, double d)
 	{
 		this->maxSamples = maxSamples;
@@ -358,7 +368,7 @@ public:
 		}
 
 		double stdDev = error / 2.0;
-		var = std::pow(stdDev, 2);
+		auto var = std::pow(stdDev, 2);
 
 		// Create a Discrete Distribution from a gaussian
 		double lower = f;
@@ -558,4 +568,21 @@ public:
 	{
 		return distribution.end();
 	}
+
+	 DiscreteDistribution(double g, double h, bool& retSuccess) {
+        if (hValueTable.find(h) == hValueTable.end()) {
+            retSuccess = false;
+            return;
+        }
+
+        auto& probNodeList = hValueTable[h];
+
+        for (auto& probNode : probNodeList) {
+            probNode.cost += g;
+            distribution.insert(probNode);
+        }
+
+        retSuccess = true;
+    }
+
 };
