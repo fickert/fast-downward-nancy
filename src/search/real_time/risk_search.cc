@@ -105,7 +105,7 @@ namespace real_time
       auto succ_node = search_space->get_node(succ_state);
       if (succ_node.is_new())
         succ_node.open(root_node, op, op.get_cost());
-      else if (op.get_cost() < succ_node.get_g())
+      else if (!succ_node.is_dead_end() && op.get_cost() < succ_node.get_g())
         succ_node.reopen(root_node, op, op.get_cost());
       else
         continue;
