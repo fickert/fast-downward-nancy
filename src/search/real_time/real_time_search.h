@@ -9,6 +9,8 @@
 #include "../open_list.h"
 #include "../search_engine.h"
 
+#include "util.h"
+
 #include <memory>
 
 namespace real_time {
@@ -35,6 +37,8 @@ class RealTimeSearch : public SearchEngine {
 		CSERNA,
 		K_BEST
 	};
+
+	std::unique_ptr<hstar_data_type> hstar_data;
 
 	const bool evaluate_heuristic_when_learning;
 

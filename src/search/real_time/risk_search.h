@@ -49,10 +49,13 @@ namespace real_time
 
   class RiskLookaheadSearch : public LookaheadSearch
   {
+    std::shared_ptr<Evaluator> f_evaluator;
     std::shared_ptr<Evaluator> f_hat_evaluator;
     std::shared_ptr<Evaluator> heuristic;
     std::shared_ptr<Evaluator> distance_heuristic;
     TLAs tlas;
+
+    hstar_data_type *hstar_data;
 
     // stores the index of the tla that owns the state
     // this is a hack to detect and prevent a state being expanded
@@ -79,7 +82,8 @@ namespace real_time
                         std::shared_ptr<Evaluator> distance,
                         bool store_exploration_data,
                         ExpansionDelay *expansion_delay,
-                        HeuristicError *heuristic_error);
+                        HeuristicError *heuristic_error,
+                        hstar_data_type *hstar_data);
     ~RiskLookaheadSearch() override = default;
 
     void initialize(const GlobalState &initial_state) override;

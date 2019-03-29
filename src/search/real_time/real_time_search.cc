@@ -18,6 +18,9 @@ RealTimeSearch::RealTimeSearch(const options::Options &opts)
 	  solution_cost(0),
 	  evaluate_heuristic_when_learning(LookaheadSearchMethod(opts.get_enum("lookahead_search")) == LookaheadSearchMethod::BREADTH_FIRST) {
 
+	if (opts.contains("hstar_data"))
+		hstar_data = std::make_unique<hstar_data_type>(read_hstar_data(opts.get<std::string>("hstar_data")));
+
 	heuristic = opts.get<std::shared_ptr<Evaluator>>("h");
 	if (opts.get<bool>("learning"))
 		heuristic = std::make_shared<LearningEvaluator>(heuristic);
@@ -36,7 +39,7 @@ RealTimeSearch::RealTimeSearch(const options::Options &opts)
 		lookahead_search = std::make_unique<FHatLookaheadSearch>(state_registry, opts.get<int>("lookahead_bound"), heuristic, distance_heuristic, static_cast<bool>(dijkstra_learning), expansion_delay.get(), *heuristic_error);
 		break;
 	case LookaheadSearchMethod::RISK:
-		lookahead_search = std::make_unique<RiskLookaheadSearch>(state_registry, opts.get<int>("lookahead_bound"), heuristic, distance_heuristic, static_cast<bool>(dijkstra_learning), expansion_delay.get(), heuristic_error.get());
+		lookahead_search = std::make_unique<RiskLookaheadSearch>(state_registry, opts.get<int>("lookahead_bound"), heuristic, distance_heuristic, static_cast<bool>(dijkstra_learning), expansion_delay.get(), heuristic_error.get(), hstar_data.get());
 		break;
 	default:
 		std::cerr << "unknown lookahead search method: " << opts.get_enum("lookahead_search") << std::endl;
@@ -71,6 +74,15 @@ RealTimeSearch::RealTimeSearch(const options::Options &opts)
 			const auto state = state_registry.lookup_state(state_id);
 			const auto node = lookahead_search_space.get_node(state);
 			auto eval_context = EvaluationContext(state, node.get_g(), false, nullptr, false);
+			if (eval_context.is_evaluator_value_infinite(heuristic.get()))
+				return EvaluationResult::INFTY;
+			if (hstar_data) {
+				const auto hstar_data_it = hstar_data->find(eval_context.get_evaluator_value(heuristic.get()));
+				if (hstar_data_it != std::end(*hstar_data)) {
+					auto distribution = DiscreteDistribution(MAX_SAMPLES, hstar_data_it->second);
+					return static_cast<int>(std::lround(distribution.expectedCost()));
+				}
+			}
 			const auto f = eval_context.get_evaluator_value_or_infinity(f_evaluator.get());
 			const auto f_hat = eval_context.get_evaluator_value_or_infinity(f_hat_evaluator.get());
 			const auto d = eval_context.get_evaluator_value_or_infinity(distance_heuristic.get());
@@ -78,7 +90,7 @@ RealTimeSearch::RealTimeSearch(const options::Options &opts)
 				return EvaluationResult::INFTY;
 			// Note: Maybe it would be convenient to store the distribution per node
 			// since we could already use them in the lookahead stage
-			auto distribution = DiscreteDistribution(100, f, f_hat, d, f_hat - f);
+			auto distribution = DiscreteDistribution(MAX_SAMPLES, f, f_hat, d, f_hat - f);
 			return static_cast<int>(std::lround(distribution.expectedCost()));
 		});
 		break;
@@ -192,6 +204,7 @@ static auto _parse(options::OptionParser &parser) -> std::shared_ptr<SearchEngin
 	parser.add_enum_option("decision_strategy", {"MINIMIN", "BELLMAN", "NANCY", "CSERNA", "K_BEST"}, "Top-level action selection strategy", "MINIMIN");
 	parser.add_option<int>("k", "Value for k-best decision strategy", "3");
 	parser.add_option<int>("expansion_delay_window_size", "Sliding average window size used for the computation of expansion delays (set this to 0 to use the global average)", "0", options::Bounds("0", ""));
+	parser.add_option<std::string>("hstar_data", "file containing h* data", options::OptionParser::NONE);
 
 	SearchEngine::add_options_to_parser(parser);
 	const auto opts = parser.parse();

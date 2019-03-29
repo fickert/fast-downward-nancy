@@ -46,6 +46,14 @@ int SearchNode::get_real_g() const {
     return info.real_g;
 }
 
+auto SearchNode::get_parent_state_id() const -> StateID {
+	return info.parent_state_id;
+}
+
+auto SearchNode::get_creating_operator() const -> OperatorID {
+	return info.creating_operator;
+}
+
 void SearchNode::open_initial() {
     assert(info.status == SearchNodeInfo::NEW);
     info.status = SearchNodeInfo::OPEN;

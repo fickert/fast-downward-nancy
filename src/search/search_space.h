@@ -35,6 +35,9 @@ public:
     int get_g() const;
     int get_real_g() const;
 
+    auto get_parent_state_id() const -> StateID;
+    auto get_creating_operator() const -> OperatorID;
+
     void open_initial();
     void open(const SearchNode &parent_node,
               const OperatorProxy &parent_op,
