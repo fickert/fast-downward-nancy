@@ -289,6 +289,9 @@ namespace real_time
     assert(statistics);
     while (statistics->get_expanded() < lookahead_bound) {
 
+      if (tlas.size() == 0u)
+        return FAILED;
+
       // setup work: find tla to expand under
       backup_beliefs();
       int tla_id = select_tla();
