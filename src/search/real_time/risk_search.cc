@@ -3,13 +3,9 @@
 #include "expansion_delay.h"
 #include "heuristic_error.h"
 #include "util.h"
-#include "../evaluators/g_evaluator.h"
-#include "../evaluators/sum_evaluator.h"
 #include "../open_lists/tiebreaking_open_list.h"
 #include "../options/plugin.h"
-#include "../tasks/root_task.h"
 #include "../task_utils/task_properties.h"
-#include "../open_lists/best_first_open_list.h"
 
 
 namespace real_time
@@ -49,7 +45,7 @@ namespace real_time
   DiscreteDistribution RiskLookaheadSearch::node_belief(SearchNode const &node)
   {
     auto eval_context = EvaluationContext(node.get_state(), node.get_g(), false, nullptr, false);
-    const auto f = eval_context.get_evaluator_value_or_infinity(heuristic.get());
+    const auto f = eval_context.get_evaluator_value_or_infinity(f_evaluator.get());
     assert(f != EvaluationResult::INFTY);
     const auto f_hat = eval_context.get_evaluator_value_or_infinity(f_hat_evaluator.get());
     assert(f_hat != EvaluationResult::INFTY);
@@ -384,6 +380,7 @@ namespace real_time
       bool store_exploration_data, ExpansionDelay *expansion_delay, HeuristicError *heuristic_error)
     : LookaheadSearch(state_registry, lookahead_bound, store_exploration_data,
                       expansion_delay, heuristic_error),
+      f_evaluator(std::make_shared<sum_evaluator::SumEvaluator>(std::vector<std::shared_ptr<Evaluator>>{heuristic, std::make_shared<g_evaluator::GEvaluator>()})),
       f_hat_evaluator(create_f_hat_evaluator(heuristic, distance, *heuristic_error)),
       heuristic(heuristic),
       distance_heuristic(distance)

@@ -49,6 +49,7 @@ namespace real_time
 
   class RiskLookaheadSearch : public LookaheadSearch
   {
+    std::shared_ptr<Evaluator> f_evaluator;
     std::shared_ptr<Evaluator> f_hat_evaluator;
     std::shared_ptr<Evaluator> heuristic;
     std::shared_ptr<Evaluator> distance_heuristic;
