@@ -115,6 +115,7 @@ SearchStatus AStarSolveAll::step() {
     GlobalState s = node.get_state();
 	if (task_properties::is_goal_state(task_proxy, s)) {
 		if (solved_states.empty()) {
+			current_search_space->trace_path(s, initial_plan);
 			assert(static_cast<int>(expanded_states.size()) == statistics.get_expanded());
 			std::cout << "Found initial solution after " << statistics.get_expanded() << " expansions, continuing to solve all expanded states..." << std::endl;
 		}
@@ -268,6 +269,7 @@ auto AStarSolveAll::update_hstar_from_state(const SearchNode &node, int hstar) -
 
 	if (expanded_states.empty()) {
 		dump_hstar_values();
+		set_plan(initial_plan);
 		return SOLVED;
 	}
 

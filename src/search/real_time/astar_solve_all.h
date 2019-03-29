@@ -34,6 +34,7 @@ class AStarSolveAll : public SearchEngine {
 
 	std::unordered_set<StateID> expanded_states;
 	std::unordered_map<StateID, std::pair<int, int>> solved_states;
+	Plan initial_plan;
 
 	auto update_hstar_from_state(const SearchNode &node, int hstar) -> SearchStatus;
 
