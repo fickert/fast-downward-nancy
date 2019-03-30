@@ -1,21 +1,22 @@
 #include "astar_solve_all.h"
 
-#include "../evaluation_context.h"
-#include "../evaluator.h"
-#include "../open_list_factory.h"
-#include "../option_parser.h"
-#include "../pruning_method.h"
-
 #include "../algorithms/ordered_set.h"
+#include "../evaluator.h"
+#include "../evaluation_context.h"
+#include "../evaluators/g_evaluator.h"
+#include "../evaluators/sum_evaluator.h"
+#include "../evaluators/weighted_evaluator.h"
+#include "../open_list_factory.h"
+#include "../open_lists/tiebreaking_open_list.h"
+#include "../options/plugin.h"
+#include "../pruning_method.h"
 #include "../task_utils/successor_generator.h"
+#include "../task_utils/task_properties.h"
 
 #include <cassert>
+#include <fstream>
 #include <memory>
 #include <set>
-#include "../options/plugin.h"
-#include "../search_engines/search_common.h"
-#include "../task_utils/task_properties.h"
-#include <fstream>
 
 using namespace std;
 
@@ -29,9 +30,11 @@ AStarSolveAll::AStarSolveAll(const Options &opts)
       current_search_space(std::make_unique<SearchSpace>(state_registry)),
       f_evaluator(opts.get<shared_ptr<Evaluator>>("f_eval", nullptr)),
       evaluator(opts.get<std::shared_ptr<Evaluator>>("eval")),
+      weight(opts.get<int>("w")),
       preferred_operator_evaluators(opts.get_list<shared_ptr<Evaluator>>("preferred")),
       pruning_method(opts.get<shared_ptr<PruningMethod>>("pruning")),
-      hstar_file(opts.get<std::string>("hstar_file")) {
+      hstar_file(opts.get<std::string>("hstar_file")),
+      computing_initial_solution(true) {
 }
 
 void AStarSolveAll::initialize() {
@@ -114,10 +117,17 @@ SearchStatus AStarSolveAll::step() {
 
     GlobalState s = node.get_state();
 	if (task_properties::is_goal_state(task_proxy, s)) {
-		if (solved_states.empty()) {
+		if (computing_initial_solution) {
+			assert(solved_states.empty());
 			current_search_space->trace_path(s, initial_plan);
 			assert(static_cast<int>(expanded_states.size()) == statistics.get_expanded());
 			std::cout << "Found initial solution after " << statistics.get_expanded() << " expansions, continuing to solve all expanded states..." << std::endl;
+			vector<shared_ptr<Evaluator>> evals = {f_evaluator, evaluator};
+			Options options;
+			options.set("evals", evals);
+			options.set("pref_only", false);
+			options.set("unsafe_pruning", false);
+			open_list = std::make_unique<tiebreaking_open_list::TieBreakingOpenListFactory>(options)->create_state_open_list();
 		}
 		return update_hstar_from_state(node, 0);
 	}
@@ -249,23 +259,27 @@ void AStarSolveAll::dump_hstar_values() const {
 auto AStarSolveAll::update_hstar_from_state(const SearchNode &node, int hstar) -> SearchStatus {
 	auto current_state = node.get_state();
 
-	for (;;) {
-		const auto expanded_states_it = expanded_states.find(current_state.get_id());
-		if (expanded_states_it != std::end(expanded_states)) {
-			expanded_states.erase(expanded_states_it);
-			auto eval_context = EvaluationContext(current_state);
-			assert(solved_states.find(current_state.get_id()) == std::end(solved_states));
-			assert(eval_context.get_evaluator_value(evaluator.get()) <= hstar);
-			solved_states.emplace(current_state.get_id(), std::make_pair(eval_context.get_evaluator_value(evaluator.get()), hstar));
+	if (!computing_initial_solution || weight <= 1) {
+		for (;;) {
+			const auto expanded_states_it = expanded_states.find(current_state.get_id());
+			if (expanded_states_it != std::end(expanded_states)) {
+				expanded_states.erase(expanded_states_it);
+				auto eval_context = EvaluationContext(current_state);
+				assert(solved_states.find(current_state.get_id()) == std::end(solved_states));
+				assert(eval_context.get_evaluator_value(evaluator.get()) <= hstar);
+				solved_states.emplace(current_state.get_id(), std::make_pair(eval_context.get_evaluator_value(evaluator.get()), hstar));
+			}
+
+			auto current_node = current_search_space->get_node(current_state);
+			if (current_node.get_creating_operator() == OperatorID::no_operator)
+				break;
+
+			current_state = state_registry.lookup_state(current_node.get_parent_state_id());
+			hstar += task_proxy.get_operators()[current_node.get_creating_operator()].get_cost();
 		}
-
-		auto current_node = current_search_space->get_node(current_state);
-		if (current_node.get_creating_operator() == OperatorID::no_operator)
-			break;
-
-		current_state = state_registry.lookup_state(current_node.get_parent_state_id());
-		hstar += task_proxy.get_operators()[current_node.get_creating_operator()].get_cost();
 	}
+
+	computing_initial_solution = false;
 
 	if (expanded_states.empty()) {
 		dump_hstar_values();
@@ -315,7 +329,7 @@ pair<SearchNode, bool> AStarSolveAll::fetch_next_node() {
 
         assert(!node.is_dead_end());
 
-		if (solved_states.empty())
+		if (computing_initial_solution)
 			expanded_states.emplace(id);
         node.close();
         assert(!node.is_dead_end());
@@ -356,7 +370,7 @@ void AStarSolveAll::update_f_value_statistics(const SearchNode &node) {
     }
 }
 
-static shared_ptr<SearchEngine> _parse(OptionParser &parser) {
+static shared_ptr<SearchEngine> _parse(options::OptionParser &parser) {
 	parser.document_synopsis(
 		"A* search (eager)",
 		"A* is a special case of eager best first search that uses g+h "
@@ -371,6 +385,7 @@ static shared_ptr<SearchEngine> _parse(OptionParser &parser) {
 		"               reopen_closed=true, f_eval=sum([g(), h]))\n"
 		"```\n", true);
 	parser.add_option<shared_ptr<Evaluator>>("eval", "evaluator for h-value");
+	parser.add_option<int>("w", "evaluator weight", "1");
 	parser.add_option<std::string>("hstar_file", "file name to dump h* values", "hstar_values.txt");
 
 	SearchEngine::add_pruning_option(parser);
@@ -379,9 +394,17 @@ static shared_ptr<SearchEngine> _parse(OptionParser &parser) {
 
 	shared_ptr<AStarSolveAll> engine;
 	if (!parser.dry_run()) {
-		auto temp = search_common::create_astar_open_list_factory_and_f_eval(opts);
-		opts.set("open", temp.first);
-		opts.set("f_eval", temp.second);
+		auto g = make_shared<g_evaluator::GEvaluator>();
+		auto h = opts.get<shared_ptr<Evaluator>>("eval");
+		auto weighted_h = make_shared<weighted_evaluator::WeightedEvaluator>(h, opts.get<int>("w"));
+		auto f = make_shared<sum_evaluator::SumEvaluator>(vector<shared_ptr<Evaluator>>({g, h}));
+		auto weighted_f = make_shared<sum_evaluator::SumEvaluator>(vector<shared_ptr<Evaluator>>({g, weighted_h}));
+		Options open_list_options;
+		open_list_options.set("evals", vector<shared_ptr<Evaluator>>{weighted_f, h});
+		open_list_options.set("pref_only", false);
+		open_list_options.set("unsafe_pruning", false);
+		opts.set<std::shared_ptr<OpenListFactory>>("open", make_shared<tiebreaking_open_list::TieBreakingOpenListFactory>(open_list_options));
+		opts.set<std::shared_ptr<Evaluator>>("f_eval", f);
 		opts.set("reopen_closed", true);
 		vector<shared_ptr<Evaluator>> preferred_list;
 		opts.set("preferred", preferred_list);

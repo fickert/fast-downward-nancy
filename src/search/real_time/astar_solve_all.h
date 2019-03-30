@@ -24,6 +24,7 @@ class AStarSolveAll : public SearchEngine {
     std::shared_ptr<Evaluator> f_evaluator;
 
 	std::shared_ptr<Evaluator> evaluator;
+	const int weight;
     std::vector<Evaluator *> path_dependent_evaluators;
     std::vector<std::shared_ptr<Evaluator>> preferred_operator_evaluators;
 
@@ -34,6 +35,7 @@ class AStarSolveAll : public SearchEngine {
 
 	std::unordered_set<StateID> expanded_states;
 	std::unordered_map<StateID, std::pair<int, int>> solved_states;
+	bool computing_initial_solution;
 	Plan initial_plan;
 
 	auto update_hstar_from_state(const SearchNode &node, int hstar) -> SearchStatus;
