@@ -103,6 +103,7 @@ void AStarSolveAll::print_checkpoint_line(int g) const {
 }
 
 void AStarSolveAll::print_statistics() const {
+	dump_hstar_values();
     statistics.print_detailed_statistics();
     search_space.print_statistics();
     pruning_method->print_statistics();
@@ -282,7 +283,6 @@ auto AStarSolveAll::update_hstar_from_state(const SearchNode &node, int hstar) -
 	computing_initial_solution = false;
 
 	if (expanded_states.empty()) {
-		dump_hstar_values();
 		set_plan(initial_plan);
 		return SOLVED;
 	}
