@@ -169,6 +169,9 @@ SearchStatus RealTimeSearch::step() {
 		return SOLVED;
 	}
 
+	if (lookahead_search->get_frontier().empty())
+		return FAILED;
+
 	if (dijkstra_learning)
 		dijkstra_learning->apply_updates(lookahead_search->get_predecessors(), lookahead_search->get_frontier(), lookahead_search->get_closed(), evaluate_heuristic_when_learning);
 
