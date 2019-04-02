@@ -34,7 +34,10 @@ AStarSolveAll::AStarSolveAll(const Options &opts)
       preferred_operator_evaluators(opts.get_list<shared_ptr<Evaluator>>("preferred")),
       pruning_method(opts.get<shared_ptr<PruningMethod>>("pruning")),
       hstar_file(opts.get<std::string>("hstar_file")),
-      computing_initial_solution(true) {
+      successors_file(opts.get<std::string>("successors_file")),
+      computing_initial_solution(true),
+      reserved_time(opts.get<double>("reserved_time")),
+      timer(std::numeric_limits<double>::infinity()) {
 }
 
 void AStarSolveAll::initialize() {
@@ -94,6 +97,11 @@ void AStarSolveAll::initialize() {
     print_initial_evaluator_values(eval_context);
 
     pruning_method->initialize(task);
+
+	if (!std::isinf(max_time)) {
+		assert(max_time - reserved_time > 0);
+		timer = utils::CountdownTimer(max_time - reserved_time);
+	}
 }
 
 void AStarSolveAll::print_checkpoint_line(int g) const {
@@ -103,13 +111,18 @@ void AStarSolveAll::print_checkpoint_line(int g) const {
 }
 
 void AStarSolveAll::print_statistics() const {
-	dump_hstar_values();
     statistics.print_detailed_statistics();
     search_space.print_statistics();
     pruning_method->print_statistics();
 }
 
 SearchStatus AStarSolveAll::step() {
+	if (timer.is_expired()) {
+		dump_hstar_values();
+		compute_and_dump_successors_data();
+		return TIMEOUT;
+	}
+
     pair<SearchNode, bool> n = fetch_next_node();
     if (!n.second) {
         return FAILED;
@@ -257,6 +270,43 @@ void AStarSolveAll::dump_hstar_values() const {
 	std::cout << "dumped h* values to " << hstar_file << std::endl;
 }
 
+void AStarSolveAll::compute_and_dump_successors_data() {
+	auto out = std::ofstream(successors_file);
+	const auto dump_successors_data = [&out, this](const auto &state) {
+		auto applicable_ops = std::vector<OperatorID>();
+		successor_generator.generate_applicable_ops(state, applicable_ops);
+		assert(!applicable_ops.empty());
+		for (auto op_id : applicable_ops) {
+			auto op = task_proxy.get_operators()[op_id];
+			auto successor = state_registry.get_successor_state(state, op);
+			auto eval_context = EvaluationContext(successor);
+			if (!eval_context.is_evaluator_value_infinite(evaluator.get()))
+				out << " " << op.get_cost() << " " << eval_context.get_evaluator_value(evaluator.get());
+		}
+	};
+	for (const auto &[state_id, h_values] : solved_states) {
+		auto state = state_registry.lookup_state(state_id);
+		const auto [h, hstar] = h_values;
+		if (task_properties::is_goal_state(task_proxy, state) || hstar == EvaluationResult::INFTY)
+			continue;
+		out << h;
+		dump_successors_data(state);
+		out << '\n';
+	}
+	for (const auto &state_id : expanded_states) {
+		auto state = state_registry.lookup_state(state_id);
+		auto eval_context = EvaluationContext(state);
+		if (task_properties::is_goal_state(task_proxy, state) || eval_context.is_evaluator_value_infinite(evaluator.get()))
+			continue;
+		const auto h = eval_context.get_evaluator_value(evaluator.get());
+		out << h;
+		dump_successors_data(state);
+		out << '\n';
+	}
+	out.close();
+	std::cout << "dumped successors data to " << successors_file << std::endl;
+}
+
 auto AStarSolveAll::update_hstar_from_state(const SearchNode &node, int hstar) -> SearchStatus {
 	auto current_state = node.get_state();
 
@@ -284,6 +334,8 @@ auto AStarSolveAll::update_hstar_from_state(const SearchNode &node, int hstar) -
 
 	if (expanded_states.empty()) {
 		set_plan(initial_plan);
+		dump_hstar_values();
+		compute_and_dump_successors_data();
 		return SOLVED;
 	}
 
@@ -387,6 +439,8 @@ static shared_ptr<SearchEngine> _parse(options::OptionParser &parser) {
 	parser.add_option<shared_ptr<Evaluator>>("eval", "evaluator for h-value");
 	parser.add_option<int>("w", "evaluator weight", "1");
 	parser.add_option<std::string>("hstar_file", "file name to dump h* values", "hstar_values.txt");
+	parser.add_option<std::string>("successors_file", "file name to dump post-expansion data", "successors_data.txt");
+	parser.add_option<double>("reserved_time", "reserved time to dump data", "0", Bounds("0", ""));
 
 	SearchEngine::add_pruning_option(parser);
 	SearchEngine::add_options_to_parser(parser);

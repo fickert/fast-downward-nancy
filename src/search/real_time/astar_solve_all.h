@@ -3,6 +3,7 @@
 
 #include "../open_list.h"
 #include "../search_engine.h"
+#include "../utils/countdown_timer.h"
 
 #include <memory>
 #include <vector>
@@ -33,13 +34,18 @@ class AStarSolveAll : public SearchEngine {
 	const std::string hstar_file;
 	void dump_hstar_values() const;
 
+	const std::string successors_file;
+	void compute_and_dump_successors_data();
+
 	std::unordered_set<StateID> expanded_states;
 	std::unordered_map<StateID, std::pair<int, int>> solved_states;
 	bool computing_initial_solution;
 	Plan initial_plan;
 
-	auto update_hstar_from_state(const SearchNode &node, int hstar) -> SearchStatus;
+	const double reserved_time;
+	utils::CountdownTimer timer;
 
+	auto update_hstar_from_state(const SearchNode &node, int hstar) -> SearchStatus;
 
     std::pair<SearchNode, bool> fetch_next_node();
     void start_f_value_statistics(EvaluationContext &eval_context);
