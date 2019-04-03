@@ -16,6 +16,7 @@ RealTimeSearch::RealTimeSearch(const options::Options &opts)
 	  current_state(state_registry.get_initial_state()),
 	  num_rts_phases(0),
 	  solution_cost(0),
+	  gaussian_fallback_count(0),
 	  evaluate_heuristic_when_learning(LookaheadSearchMethod(opts.get_enum("lookahead_search")) == LookaheadSearchMethod::BREADTH_FIRST) {
 
 	if (opts.contains("hstar_data"))
@@ -82,6 +83,7 @@ RealTimeSearch::RealTimeSearch(const options::Options &opts)
 					auto distribution = DiscreteDistribution(MAX_SAMPLES, hstar_data_it->second);
 					return static_cast<int>(std::lround(distribution.expectedCost()));
 				}
+				++gaussian_fallback_count;
 			}
 			const auto f = eval_context.get_evaluator_value_or_infinity(f_evaluator.get());
 			const auto f_hat = eval_context.get_evaluator_value_or_infinity(f_hat_evaluator.get());
@@ -195,6 +197,8 @@ void RealTimeSearch::print_statistics() const {
 		if (distance_heuristic)
 			std::cout << "Average distance error: " << heuristic_error->get_average_distance_error() << std::endl;
 	}
+	std::cout << "Fallback to gaussian (decision strategy): " << gaussian_fallback_count << std::endl;
+	lookahead_search->print_statistics();
 }
 
 static auto _parse(options::OptionParser &parser) -> std::shared_ptr<SearchEngine> {

@@ -49,6 +49,7 @@ namespace real_time
 		const auto hstar_data_it = hstar_data->find(eval_context.get_evaluator_value(heuristic.get()));
 		if (hstar_data_it != std::end(*hstar_data))
 			return DiscreteDistribution(MAX_SAMPLES, hstar_data_it->second);
+		++gaussian_fallback_count;
 	}
     const auto f = eval_context.get_evaluator_value_or_infinity(f_evaluator.get());
     assert(f != EvaluationResult::INFTY);
@@ -383,6 +384,10 @@ namespace real_time
     // (there's also something in the end to learn the one-step error. I'm not sure yet what that's about exactly).
   }
 
+  void RiskLookaheadSearch::print_statistics() const {
+    std::cout << "Fallback to gaussian (node belief): " << gaussian_fallback_count << std::endl;
+  }
+
   RiskLookaheadSearch::RiskLookaheadSearch(StateRegistry &state_registry, int lookahead_bound,
       std::shared_ptr<Evaluator> heuristic, std::shared_ptr<Evaluator> distance,
       bool store_exploration_data, ExpansionDelay *expansion_delay, HeuristicError *heuristic_error, hstar_data_type *hstar_data)
@@ -392,7 +397,8 @@ namespace real_time
       f_hat_evaluator(create_f_hat_evaluator(heuristic, distance, *heuristic_error)),
       heuristic(heuristic),
       distance_heuristic(distance),
-      hstar_data(hstar_data)
+      hstar_data(hstar_data),
+      gaussian_fallback_count(0)
   {
     tlas.reserve(32);
     applicables.reserve(32);

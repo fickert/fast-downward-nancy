@@ -57,6 +57,8 @@ namespace real_time
 
     hstar_data_type *hstar_data;
 
+    int gaussian_fallback_count;
+
     // stores the index of the tla that owns the state
     // this is a hack to detect and prevent a state being expanded
     // under a tla when there is a different tla that has a shorter
@@ -88,6 +90,8 @@ namespace real_time
 
     void initialize(const GlobalState &initial_state) override;
     auto search() -> SearchStatus override;
+
+	void print_statistics() const override;
 
     RiskLookaheadSearch(const RiskLookaheadSearch &) = delete;
     RiskLookaheadSearch(RiskLookaheadSearch &&) = delete;

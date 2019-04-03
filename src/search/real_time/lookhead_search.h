@@ -61,6 +61,8 @@ public:
 	virtual void initialize(const GlobalState &initial_state);
 	virtual auto search() -> SearchStatus = 0;
 
+	virtual void print_statistics() const {}
+
 	auto found_solution() const -> bool {return solution_found;}
 	auto get_plan() const -> const Plan & {return plan;}
 	auto get_statistics() const -> const SearchStatistics & {return *statistics;}
