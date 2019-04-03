@@ -20,7 +20,9 @@ RealTimeSearch::RealTimeSearch(const options::Options &opts)
 	  evaluate_heuristic_when_learning(LookaheadSearchMethod(opts.get_enum("lookahead_search")) == LookaheadSearchMethod::BREADTH_FIRST) {
 
 	if (opts.contains("hstar_data"))
-		hstar_data = std::make_unique<hstar_data_type>(read_hstar_data(opts.get<std::string>("hstar_data")));
+		hstar_data = std::make_unique<hstar_data_type<int>>(read_hstar_data<int>(opts.get<std::string>("hstar_data")));
+	if (opts.contains("post_expansion_belief_data"))
+		post_expansion_belief_data = std::make_unique<hstar_data_type<long long>>(read_hstar_data<long long>(opts.get<std::string>("post_expansion_belief_data")));
 
 	heuristic = opts.get<std::shared_ptr<Evaluator>>("h");
 	if (opts.get<bool>("learning"))
@@ -40,7 +42,7 @@ RealTimeSearch::RealTimeSearch(const options::Options &opts)
 		lookahead_search = std::make_unique<FHatLookaheadSearch>(state_registry, opts.get<int>("lookahead_bound"), heuristic, distance_heuristic, static_cast<bool>(dijkstra_learning), expansion_delay.get(), *heuristic_error);
 		break;
 	case LookaheadSearchMethod::RISK:
-		lookahead_search = std::make_unique<RiskLookaheadSearch>(state_registry, opts.get<int>("lookahead_bound"), heuristic, distance_heuristic, static_cast<bool>(dijkstra_learning), expansion_delay.get(), heuristic_error.get(), hstar_data.get());
+		lookahead_search = std::make_unique<RiskLookaheadSearch>(state_registry, opts.get<int>("lookahead_bound"), heuristic, distance_heuristic, static_cast<bool>(dijkstra_learning), expansion_delay.get(), heuristic_error.get(), hstar_data.get(), post_expansion_belief_data.get());
 		break;
 	default:
 		std::cerr << "unknown lookahead search method: " << opts.get_enum("lookahead_search") << std::endl;
@@ -212,6 +214,7 @@ static auto _parse(options::OptionParser &parser) -> std::shared_ptr<SearchEngin
 	parser.add_option<int>("k", "Value for k-best decision strategy", "3");
 	parser.add_option<int>("expansion_delay_window_size", "Sliding average window size used for the computation of expansion delays (set this to 0 to use the global average)", "0", options::Bounds("0", ""));
 	parser.add_option<std::string>("hstar_data", "file containing h* data", options::OptionParser::NONE);
+	parser.add_option<std::string>("post_expansion_belief_data", "file containing post-expansion belief data", options::OptionParser::NONE);
 
 	SearchEngine::add_options_to_parser(parser);
 	const auto opts = parser.parse();

@@ -39,7 +39,8 @@ class RealTimeSearch : public SearchEngine {
 		K_BEST
 	};
 
-	std::unique_ptr<hstar_data_type> hstar_data;
+	std::unique_ptr<hstar_data_type<int>> hstar_data;
+	std::unique_ptr<hstar_data_type<long long>> post_expansion_belief_data;
 
 	const bool evaluate_heuristic_when_learning;
 

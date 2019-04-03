@@ -49,7 +49,7 @@ namespace real_time
 		const auto hstar_data_it = hstar_data->find(eval_context.get_evaluator_value(heuristic.get()));
 		if (hstar_data_it != std::end(*hstar_data))
 			return DiscreteDistribution(MAX_SAMPLES, hstar_data_it->second);
-		++gaussian_fallback_count;
+		++hstar_gaussian_fallback_count;
 	}
     const auto f = eval_context.get_evaluator_value_or_infinity(f_evaluator.get());
     assert(f != EvaluationResult::INFTY);
@@ -58,6 +58,25 @@ namespace real_time
     const auto d = eval_context.get_evaluator_value_or_infinity(distance_heuristic.get());
     assert(d != EvaluationResult::INFTY);
     return DiscreteDistribution(MAX_SAMPLES, f, f_hat, d, f_hat - f);
+  }
+
+  void RiskLookaheadSearch::post_expansion_belief(StateID best_state_id, DiscreteDistribution &current_belief) {
+	  if (post_expansion_belief_data) {
+		  auto eval_context = EvaluationContext(state_registry.lookup_state(best_state_id), -1, false, nullptr);
+		  const auto post_expansion_belief_data_it = post_expansion_belief_data->find(eval_context.get_evaluator_value(heuristic.get()));
+		  if (post_expansion_belief_data_it != std::end(*post_expansion_belief_data)) {
+			  current_belief = DiscreteDistribution(MAX_SAMPLES, post_expansion_belief_data_it->second);
+			  return;
+		  }
+		  ++post_expansion_belief_gaussian_fallback_count;
+	  }
+	  // Belief of TLA is squished as a result of search. Mean stays the same, but variance is decreased by a factor based on expansion delay.
+	  double ds = 1 / expansion_delay->get_avg_expansion_delay();
+	  auto best_state_eval_context = EvaluationContext(state_registry.lookup_state(best_state_id), -1, false, nullptr);
+	  assert(!best_state_eval_context.is_evaluator_value_infinite(distance_heuristic.get()));
+	  double dy = best_state_eval_context.get_evaluator_value(distance_heuristic.get());
+	  double squishFactor = min(1.0, (ds / dy));
+	  current_belief.squish(squishFactor);
   }
 
   size_t TLAs::size() const
@@ -208,18 +227,9 @@ namespace real_time
       }
       assert(expansion_delay);
       // Simulate how expanding this TLA's best node would affect its belief
-      // Belief of TLA is squished as a result of search. Mean stays the same, but variance is decreased by a factor based on expansion delay.
-      double ds = 1 / expansion_delay->get_avg_expansion_delay();
-      auto best_state_id = tlas.open_lists[i]->top();
-      auto best_state_eval_context = EvaluationContext(state_registry.lookup_state(best_state_id), -1, false, nullptr);
-      assert(!best_state_eval_context.is_evaluator_value_infinite(distance_heuristic.get()));
-      double dy = best_state_eval_context.get_evaluator_value(distance_heuristic.get());
-      double squishFactor = min(1.0, (ds / dy));
-
-      auto squished_beliefs = tlas.beliefs;
-      squished_beliefs[i].squish(squishFactor);
-
-      double risk = risk_analysis(alpha, squished_beliefs);
+      auto post_expansion_beliefs = tlas.beliefs;
+      post_expansion_belief(tlas.open_lists[i]->top(), post_expansion_beliefs[i]);
+      double risk = risk_analysis(alpha, post_expansion_beliefs);
 
       // keep the minimum risk tla.
       // otherwise tie-break f_hat -> f -> g
@@ -385,12 +395,13 @@ namespace real_time
   }
 
   void RiskLookaheadSearch::print_statistics() const {
-    std::cout << "Fallback to gaussian (node belief): " << gaussian_fallback_count << std::endl;
+    std::cout << "Fallback to gaussian (node belief): " << hstar_gaussian_fallback_count << std::endl;
+    std::cout << "Fallback to gaussian (post-expansion belief): " << post_expansion_belief_gaussian_fallback_count << std::endl;
   }
 
   RiskLookaheadSearch::RiskLookaheadSearch(StateRegistry &state_registry, int lookahead_bound,
       std::shared_ptr<Evaluator> heuristic, std::shared_ptr<Evaluator> distance,
-      bool store_exploration_data, ExpansionDelay *expansion_delay, HeuristicError *heuristic_error, hstar_data_type *hstar_data)
+      bool store_exploration_data, ExpansionDelay *expansion_delay, HeuristicError *heuristic_error, hstar_data_type<int> *hstar_data, hstar_data_type<long long> *post_expansion_belief_data)
     : LookaheadSearch(state_registry, lookahead_bound, store_exploration_data,
                       expansion_delay, heuristic_error),
       f_evaluator(std::make_shared<sum_evaluator::SumEvaluator>(std::vector<std::shared_ptr<Evaluator>>{heuristic, std::make_shared<g_evaluator::GEvaluator>()})),
@@ -398,7 +409,9 @@ namespace real_time
       heuristic(heuristic),
       distance_heuristic(distance),
       hstar_data(hstar_data),
-      gaussian_fallback_count(0)
+      post_expansion_belief_data(post_expansion_belief_data),
+      hstar_gaussian_fallback_count(0),
+      post_expansion_belief_gaussian_fallback_count(0)
   {
     tlas.reserve(32);
     applicables.reserve(32);

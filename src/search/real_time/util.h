@@ -15,23 +15,28 @@ namespace real_time {
 
 static constexpr auto MAX_SAMPLES = 100;
 
+template<class count_type = int>
 struct hstar_sample {
 	int hstar_value;
-	int count;
+	count_type count;
 };
 
+template<class count_type = int>
 struct hstar_data_entry {
-	int value_count;
-	std::vector<hstar_sample> hstar_values;
+	count_type value_count;
+	std::vector<hstar_sample<count_type>> hstar_values;
 };
 
-using hstar_data_type = std::unordered_map<int, hstar_data_entry>;
+template<class count_type = int>
+using hstar_data_type = std::unordered_map<int, hstar_data_entry<count_type>>;
 
-inline auto read_hstar_data(const std::string &file_name) -> hstar_data_type {
-	auto parsed_hstar_data = hstar_data_type();
+template<class count_type = int>
+auto read_hstar_data(const std::string &file_name) -> hstar_data_type<count_type> {
+	auto parsed_hstar_data = hstar_data_type<count_type>();
 	std::ifstream f(file_name);
 	std::string line;
-	int h, valueCount, hs, hsCount;
+	int h, hs;
+	count_type valueCount, hsCount;
 
 	while (std::getline(f, line)) {
 		std::stringstream ss(line);
@@ -43,11 +48,11 @@ inline auto read_hstar_data(const std::string &file_name) -> hstar_data_type {
 			utils::exit_with(utils::ExitCode::SEARCH_INPUT_ERROR);
 		}
 
-		auto &hstar_data_for_h = parsed_hstar_data.emplace(h, hstar_data_entry{valueCount, {}}).first->second.hstar_values;
+		auto &hstar_data_for_h = parsed_hstar_data.emplace(h, hstar_data_entry<count_type>{valueCount, {}}).first->second.hstar_values;
 		while (!ss.eof()) {
 			ss >> hs;
 			ss >> hsCount;
-			hstar_data_for_h.emplace_back(hstar_sample{hs, hsCount});
+			hstar_data_for_h.emplace_back(hstar_sample<count_type>{hs, hsCount});
 		}
 	}
 	f.close();

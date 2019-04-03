@@ -315,7 +315,8 @@ public:
 		distribution.insert(ProbabilityNode(deltaSpikeValue, 1.0));
 	}
 
-	DiscreteDistribution(int maxSamples, const real_time::hstar_data_entry &hstar_data)
+	template<class count_type>
+	DiscreteDistribution(int maxSamples, const real_time::hstar_data_entry<count_type> &hstar_data)
 		: maxSamples(maxSamples) {
 		for (const auto &[hstar_value, count] : hstar_data.hstar_values)
 			distribution.emplace(hstar_value, count / static_cast<double>(hstar_data.value_count));

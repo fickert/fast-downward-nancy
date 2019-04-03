@@ -3,15 +3,11 @@
 
 #include "lookhead_search.h"
 #include "DiscreteDistribution.h"
-#include "../abstract_task.h"
 #include "../evaluator.h"
 #include "../open_list.h"
-#include "../plan_manager.h"
 #include "../search_engine.h"
 #include "../search_space.h"
 #include "../state_registry.h"
-#include "../task_utils/successor_generator.h"
-
 
 #include <memory>
 #include <vector>
@@ -55,9 +51,10 @@ namespace real_time
     std::shared_ptr<Evaluator> distance_heuristic;
     TLAs tlas;
 
-    hstar_data_type *hstar_data;
-
-    int gaussian_fallback_count;
+    hstar_data_type<int> *hstar_data;
+    hstar_data_type<long long> *post_expansion_belief_data;
+    int hstar_gaussian_fallback_count;
+    int post_expansion_belief_gaussian_fallback_count;
 
     // stores the index of the tla that owns the state
     // this is a hack to detect and prevent a state being expanded
@@ -76,6 +73,7 @@ namespace real_time
     std::size_t select_tla();
     void backup_beliefs();
     DiscreteDistribution node_belief(SearchNode const &);
+    void post_expansion_belief(StateID best_state_id, DiscreteDistribution &current_belief);
   public:
 
     RiskLookaheadSearch(StateRegistry &state_registry,
@@ -85,7 +83,8 @@ namespace real_time
                         bool store_exploration_data,
                         ExpansionDelay *expansion_delay,
                         HeuristicError *heuristic_error,
-                        hstar_data_type *hstar_data);
+                        hstar_data_type<int> *hstar_data,
+                        hstar_data_type<long long> *post_expansion_belief_data);
     ~RiskLookaheadSearch() override = default;
 
     void initialize(const GlobalState &initial_state) override;
