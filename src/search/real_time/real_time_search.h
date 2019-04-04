@@ -17,6 +17,7 @@ namespace real_time {
 
 class RealTimeSearch : public SearchEngine {
 	std::shared_ptr<Evaluator> heuristic;
+	std::shared_ptr<Evaluator> base_heuristic;
 	GlobalState current_state;
 
 	// Statistics

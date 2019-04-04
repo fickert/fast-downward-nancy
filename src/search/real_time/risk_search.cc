@@ -46,7 +46,7 @@ namespace real_time
   {
     auto eval_context = EvaluationContext(node.get_state(), node.get_g(), false, nullptr, false);
 	if (hstar_data) {
-		const auto hstar_data_it = hstar_data->find(eval_context.get_evaluator_value(heuristic.get()));
+		const auto hstar_data_it = hstar_data->find(eval_context.get_evaluator_value(base_heuristic.get()));
 		if (hstar_data_it != std::end(*hstar_data))
 			return DiscreteDistribution(MAX_SAMPLES, hstar_data_it->second);
 		++hstar_gaussian_fallback_count;
@@ -63,7 +63,7 @@ namespace real_time
   void RiskLookaheadSearch::post_expansion_belief(StateID best_state_id, DiscreteDistribution &current_belief) {
 	  if (post_expansion_belief_data) {
 		  auto eval_context = EvaluationContext(state_registry.lookup_state(best_state_id), -1, false, nullptr);
-		  const auto post_expansion_belief_data_it = post_expansion_belief_data->find(eval_context.get_evaluator_value(heuristic.get()));
+		  const auto post_expansion_belief_data_it = post_expansion_belief_data->find(eval_context.get_evaluator_value(base_heuristic.get()));
 		  if (post_expansion_belief_data_it != std::end(*post_expansion_belief_data)) {
 			  current_belief = DiscreteDistribution(MAX_SAMPLES, post_expansion_belief_data_it->second);
 			  return;
@@ -400,13 +400,14 @@ namespace real_time
   }
 
   RiskLookaheadSearch::RiskLookaheadSearch(StateRegistry &state_registry, int lookahead_bound,
-      std::shared_ptr<Evaluator> heuristic, std::shared_ptr<Evaluator> distance,
+      std::shared_ptr<Evaluator> heuristic, std::shared_ptr<Evaluator> base_heuristic, std::shared_ptr<Evaluator> distance,
       bool store_exploration_data, ExpansionDelay *expansion_delay, HeuristicError *heuristic_error, hstar_data_type<int> *hstar_data, hstar_data_type<long long> *post_expansion_belief_data)
     : LookaheadSearch(state_registry, lookahead_bound, store_exploration_data,
                       expansion_delay, heuristic_error),
       f_evaluator(std::make_shared<sum_evaluator::SumEvaluator>(std::vector<std::shared_ptr<Evaluator>>{heuristic, std::make_shared<g_evaluator::GEvaluator>()})),
       f_hat_evaluator(create_f_hat_evaluator(heuristic, distance, *heuristic_error)),
       heuristic(heuristic),
+      base_heuristic(base_heuristic),
       distance_heuristic(distance),
       hstar_data(hstar_data),
       post_expansion_belief_data(post_expansion_belief_data),

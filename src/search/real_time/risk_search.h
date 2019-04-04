@@ -48,6 +48,7 @@ namespace real_time
     std::shared_ptr<Evaluator> f_evaluator;
     std::shared_ptr<Evaluator> f_hat_evaluator;
     std::shared_ptr<Evaluator> heuristic;
+    std::shared_ptr<Evaluator> base_heuristic;
     std::shared_ptr<Evaluator> distance_heuristic;
     TLAs tlas;
 
@@ -79,6 +80,7 @@ namespace real_time
     RiskLookaheadSearch(StateRegistry &state_registry,
                         int lookahead_bound,
                         std::shared_ptr<Evaluator> heuristic,
+                        std::shared_ptr<Evaluator> base_heuristic,
                         std::shared_ptr<Evaluator> distance,
                         bool store_exploration_data,
                         ExpansionDelay *expansion_delay,

@@ -25,6 +25,7 @@ RealTimeSearch::RealTimeSearch(const options::Options &opts)
 		post_expansion_belief_data = std::make_unique<hstar_data_type<long long>>(read_hstar_data<long long>(opts.get<std::string>("post_expansion_belief_data")));
 
 	heuristic = opts.get<std::shared_ptr<Evaluator>>("h");
+	base_heuristic = heuristic;
 	if (opts.get<bool>("learning"))
 		heuristic = std::make_shared<LearningEvaluator>(heuristic);
 	initialize_optional_features(opts);
@@ -42,7 +43,7 @@ RealTimeSearch::RealTimeSearch(const options::Options &opts)
 		lookahead_search = std::make_unique<FHatLookaheadSearch>(state_registry, opts.get<int>("lookahead_bound"), heuristic, distance_heuristic, static_cast<bool>(dijkstra_learning), expansion_delay.get(), *heuristic_error);
 		break;
 	case LookaheadSearchMethod::RISK:
-		lookahead_search = std::make_unique<RiskLookaheadSearch>(state_registry, opts.get<int>("lookahead_bound"), heuristic, distance_heuristic, static_cast<bool>(dijkstra_learning), expansion_delay.get(), heuristic_error.get(), hstar_data.get(), post_expansion_belief_data.get());
+		lookahead_search = std::make_unique<RiskLookaheadSearch>(state_registry, opts.get<int>("lookahead_bound"), heuristic, base_heuristic, distance_heuristic, static_cast<bool>(dijkstra_learning), expansion_delay.get(), heuristic_error.get(), hstar_data.get(), post_expansion_belief_data.get());
 		break;
 	default:
 		std::cerr << "unknown lookahead search method: " << opts.get_enum("lookahead_search") << std::endl;
@@ -80,7 +81,7 @@ RealTimeSearch::RealTimeSearch(const options::Options &opts)
 			if (eval_context.is_evaluator_value_infinite(heuristic.get()))
 				return EvaluationResult::INFTY;
 			if (hstar_data) {
-				const auto hstar_data_it = hstar_data->find(eval_context.get_evaluator_value(heuristic.get()));
+				const auto hstar_data_it = hstar_data->find(eval_context.get_evaluator_value(base_heuristic.get()));
 				if (hstar_data_it != std::end(*hstar_data)) {
 					auto distribution = DiscreteDistribution(MAX_SAMPLES, hstar_data_it->second);
 					return static_cast<int>(std::lround(distribution.expectedCost()));
