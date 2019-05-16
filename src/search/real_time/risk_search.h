@@ -61,7 +61,7 @@ namespace real_time
     // this is a hack to detect and prevent a state being expanded
     // under a tla when there is a different tla that has a shorter
     // path to that state.
-    std::unordered_map<StateID, int> state_owner;
+    std::unordered_map<StateID, std::vector<int> > state_owners;
 
     // This is storage for applicable operators
     // It's kept here in the class because clearing a vector is

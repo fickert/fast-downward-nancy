@@ -20,20 +20,36 @@ namespace real_time
       ->create_state_open_list();
   }
 
-  bool state_owned_by_tla(std::unordered_map<StateID, int> const &state_owner, StateID state_id, int tla_id)
+  bool state_owned_by_tla(std::unordered_map<StateID, std::vector<int> > const &state_owners, StateID state_id, int tla_id)
   {
-    const auto owner = state_owner.find(state_id);
-    if (owner == state_owner.end()) {
-      assert(false);
+    const auto &owners = state_owners.find(state_id);
+    if (owners == state_owners.end()) {
       // this should never happen
-      // TODO: print error
+      assert(false);
       return false;
     }
-    if (owner->second != tla_id) {
-      // this might happen
+    auto &vec = owners->second;
+    auto found = std::find(std::begin(vec), std::end(vec), tla_id);
+    if (found == vec.end()) {
       return false;
     }
     return true;
+  }
+
+  void make_state_owner(std::unordered_map<StateID, std::vector<int> > &state_owners, StateID state_id, int tla_id)
+  {
+    auto owners = state_owners[state_id];
+    owners.clear();
+    owners.push_back(tla_id);
+  }
+
+  void add_state_owner(std::unordered_map<StateID, std::vector<int> > &state_owners, StateID state_id, int tla_id)
+  {
+    auto owners = state_owners[state_id];
+    auto found = std::find(std::begin(owners), std::end(owners), tla_id);
+    if (found == owners.end()) {
+      owners.push_back(tla_id);
+    }
   }
 
   // This generates the belief distribution from a search node.  Since
@@ -112,7 +128,7 @@ namespace real_time
   void RiskLookaheadSearch::generate_tlas(GlobalState const &current_state)
   {
     tlas.clear();
-    state_owner.clear();
+    state_owners.clear();
     if (heuristic_error)
       heuristic_error->set_expanding_state(current_state);
     auto ops = std::vector<OperatorID>();
@@ -149,7 +165,9 @@ namespace real_time
       if (expansion_delay) {
         open_list_insertion_time[succ_state.get_id()] = 0;
       }
-      state_owner[succ_state.get_id()] = static_cast<int>(tlas.ops.size()) - 1;
+      // make the tla own the state of the top level node (I assume
+      // here, that the state of all top level nodes are distinct)
+      make_state_owner(state_owners, succ_state.get_id(), static_cast<int>(tlas.ops.size()) - 1);
 
       // add the belief (and expected value)
       tlas.beliefs.push_back(node_belief(succ_node));
@@ -280,7 +298,7 @@ namespace real_time
 
         // get the best state from open
         auto state_id = tlas.open_lists[tla_id]->top();
-        if (state_owned_by_tla(state_owner, state_id, tla_id)) {
+        if (state_owned_by_tla(state_owners, state_id, tla_id)) {
           // kbestDecision with k = 1 just computes this one
           // distribution and will consequently use just that as the
           // tla's new belief
@@ -313,7 +331,7 @@ namespace real_time
       // get the state to expand, discarding states that are not owned
       StateID state_id = tlas.open_lists[tla_id]->remove_min();
       while (1) {
-        if (state_owned_by_tla(state_owner, state_id, tla_id))
+        if (state_owned_by_tla(state_owners, state_id, tla_id))
           break;
         if (tlas.open_lists[tla_id]->empty())
           return FAILED;
@@ -328,7 +346,8 @@ namespace real_time
       }
 
       mark_expanded(node);
-      state_owner[state_id] = tla_id;
+      assert(state_owned_by_tla(state_owners, state_id, tla_id));
+      // state_owner[state_id] = tla_id;
 
       if (check_goal_and_set_plan(state)) {
         return SOLVED;
@@ -362,15 +381,25 @@ namespace real_time
           }
           succ_node.open(node, op, op.get_cost());
           tlas.open_lists[tla_id]->insert(succ_eval_context, succ_state.get_id());
-          state_owner[succ_state.get_id()] = tla_id;
-        } else if (succ_node.get_g() > node.get_g() + op.get_cost()) {
-          // We found a new cheapest path to an open or closed state.
-          if (succ_node.is_closed())
-            statistics->inc_reopened();
-          succ_node.reopen(node, op, op.get_cost());
-          auto succ_eval_context = EvaluationContext(succ_state, succ_node.get_g(), false, statistics.get());
-          tlas.open_lists[tla_id]->insert(succ_eval_context, succ_state.get_id());
-          state_owner[succ_state.get_id()] = tla_id;
+          make_state_owner(state_owners, succ_state.get_id(), tla_id);
+        } else {
+          auto const old_g = node.get_g() + op.get_cost();
+          auto const new_g = succ_node.get_g();
+          if (old_g >= new_g) {
+            if (succ_node.is_closed())
+              statistics->inc_reopened();
+            succ_node.reopen(node, op, op.get_cost());
+            auto succ_eval_context = EvaluationContext(succ_state, old_g, false, statistics.get());
+            tlas.open_lists[tla_id]->insert(succ_eval_context, succ_state.get_id());
+
+            if (old_g != new_g) {
+              // new cheapest path to this state
+              make_state_owner(state_owners, succ_state.get_id(), tla_id);
+            } else {
+              // there are cheapest paths below more than one tla leading to this state
+              add_state_owner(state_owners, succ_state.get_id(), tla_id);
+            }
+          }
         }
 
         open_list_insertion_time[state_id] = statistics->get_expanded();
@@ -385,7 +414,7 @@ namespace real_time
     for (size_t i = 0; i < tlas.open_lists.size(); ++i) {
       while (!tlas.open_lists[i]->empty()) {
         StateID state_id = tlas.open_lists[i]->remove_min();
-        if (state_owned_by_tla(state_owner, state_id, i))
+        if (state_owned_by_tla(state_owners, state_id, i))
           frontier.push_back(state_id);
       }
     }
@@ -416,6 +445,6 @@ namespace real_time
   {
     tlas.reserve(32);
     applicables.reserve(32);
-    state_owner.reserve(lookahead_bound);
+    state_owners.reserve(lookahead_bound);
   }
 }
