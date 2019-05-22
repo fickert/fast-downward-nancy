@@ -3,6 +3,7 @@
 
 #include "decision_strategy.h"
 #include "dijkstra_learning.h"
+#include "nancy_learning.h"
 #include "expansion_delay.h"
 #include "heuristic_error.h"
 #include "lookhead_search.h"
@@ -40,13 +41,23 @@ class RealTimeSearch : public SearchEngine {
 		K_BEST
 	};
 
+  enum class LearningMethod {
+    NONE,
+    DIJKSTRA,
+    NANCY,
+  };
+
 	std::unique_ptr<hstar_data_type<int>> hstar_data;
 	std::unique_ptr<hstar_data_type<long long>> post_expansion_belief_data;
 
 	const bool evaluate_heuristic_when_learning;
 
 	std::unique_ptr<LookaheadSearch> lookahead_search;
-	std::unique_ptr<DijkstraLearning> dijkstra_learning;
+  LearningMethod learning_method;
+  // C++ doesn't let me put the learning method classes into a union
+  // unfortunately, because of non-trivial types
+  std::unique_ptr<DijkstraLearning> dijkstra_learning;
+  std::unique_ptr<NancyLearning> nancy_learning;
 	std::unique_ptr<real_time::DecisionStrategy> decision_strategy;
 
 	std::shared_ptr<Evaluator> distance_heuristic;
@@ -60,7 +71,7 @@ protected:
 
 public:
 	explicit RealTimeSearch(const options::Options &opts);
-	~RealTimeSearch() override = default;
+	~RealTimeSearch() override {};
 
 	void print_statistics() const override;
 };
