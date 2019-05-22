@@ -768,6 +768,7 @@ fast_downward_plugin(
         real_time/debiased_heuristic
         real_time/decision_strategy
         real_time/dijkstra_learning
+        real_time/nancy_learning
         real_time/expansion_delay
         real_time/heuristic_error
         real_time/learning_evaluator

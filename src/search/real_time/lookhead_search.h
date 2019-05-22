@@ -9,6 +9,7 @@
 #include "../search_space.h"
 #include "../state_registry.h"
 #include "../task_utils/successor_generator.h"
+#include "DiscreteDistribution.h"
 
 #include <memory>
 #include <vector>
@@ -71,6 +72,9 @@ public:
 	auto get_frontier() const -> const decltype(frontier) & { return frontier; }
 	auto get_predecessors() const -> const decltype(predecessors) & { return predecessors; }
 	auto get_closed() const -> const decltype(closed) & { return closed; }
+
+  // only implemented for lookahead search methods making use of distributions (risk)
+  virtual auto get_beliefs() -> PerStateInformation<ShiftedDistribution> * { return nullptr; }
 };
 
 class EagerLookaheadSearch : public LookaheadSearch {
