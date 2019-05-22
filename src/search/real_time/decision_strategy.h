@@ -3,6 +3,8 @@
 
 #include "../operator_id.h"
 #include "../state_id.h"
+#include "../per_state_information.h"
+#include "DiscreteDistribution.h"
 
 #include <functional>
 
@@ -28,6 +30,19 @@ public:
 	~ScalarDecisionStrategy() override = default;
 
 	auto get_top_level_action(const std::vector<StateID> &frontier, SearchSpace &search_space) const -> OperatorID override;
+};
+
+class ProbabilisticDecisionStrategy : public DecisionStrategy
+{
+	const StateRegistry &state_registry;
+  PerStateInformation<ShiftedDistribution> const *beliefs;
+
+public:
+	ProbabilisticDecisionStrategy(const StateRegistry &state_registry, PerStateInformation<ShiftedDistribution> const *beliefs);
+	~ProbabilisticDecisionStrategy() override = default;
+  auto get_top_level_action(const std::vector<StateID> &frontier, SearchSpace &search_space) const -> OperatorID override;
+
+  virtual bool state_cheaper(const StateID &a, const StateID &b) const;
 };
 
 }
