@@ -180,7 +180,6 @@ SearchStatus RealTimeSearch::step() {
       auto beliefs = lookahead_search->get_beliefs();
       assert(beliefs != nullptr);
       nancy_learning->apply_updates(lookahead_search->get_predecessors(), lookahead_search->get_frontier(), lookahead_search->get_closed(), beliefs);
-      // TODO: implement
     }
     break;
   }
