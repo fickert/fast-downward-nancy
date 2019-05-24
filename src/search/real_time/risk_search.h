@@ -40,6 +40,7 @@ struct TLAs
   std::vector<Queue> open_lists;
   // backed up belief for each tla
   std::vector<ShiftedDistribution> beliefs;
+  std::vector<ShiftedDistribution> post_beliefs;
   std::vector<StateID> states;
   /*
   // "states" stores the top most states of each tla.
@@ -77,6 +78,7 @@ class RiskLookaheadSearch : public LookaheadSearch
   // are cached in raw_beliefs, same for the post_expansion
   // distributions.
   PerStateInformation<ShiftedDistribution> beliefs;
+  PerStateInformation<ShiftedDistribution> post_beliefs;
   std::vector<DiscreteDistribution*> raw_beliefs;
   std::vector<DiscreteDistribution*> raw_post_beliefs;
 
@@ -106,7 +108,7 @@ protected:
   std::size_t select_tla();
   void backup_beliefs();
   ShiftedDistribution node_belief(SearchNode const &);
-  ShiftedDistribution post_expansion_belief(StateID best_state_id, ShiftedDistribution const *current_belief);
+  ShiftedDistribution post_expansion_belief(StateID best_state_id);
 public:
 
   RiskLookaheadSearch(StateRegistry &state_registry,
@@ -133,6 +135,7 @@ public:
   auto operator=(RiskLookaheadSearch &&) = delete;
 
   auto get_beliefs() -> PerStateInformation<ShiftedDistribution> * { return &beliefs; }
+  auto get_post_beliefs() -> PerStateInformation<ShiftedDistribution> * { return &post_beliefs; }
 };
 
 }

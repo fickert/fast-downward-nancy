@@ -16,10 +16,11 @@ void NancyLearning::apply_updates(const std::unordered_map<StateID,
                                   std::vector<std::pair<StateID, OperatorProxy>>> &predecessors,
                                   const std::vector<StateID> &frontier,
                                   const std::unordered_set<StateID> &closed,
-                                  PerStateInformation<ShiftedDistribution> *beliefs) const
+                                  PerStateInformation<ShiftedDistribution> *beliefs,
+                                  PerStateInformation<ShiftedDistribution> *post_beliefs) const
 {
   auto closed_copy = closed;
-  apply_updates(predecessors, frontier, std::move(closed_copy), beliefs);
+  apply_updates(predecessors, frontier, std::move(closed_copy), beliefs, post_beliefs);
 }
 
 
@@ -44,7 +45,8 @@ void NancyLearning::apply_updates(const std::unordered_map<StateID,
                                   std::vector<std::pair<StateID,
                                   OperatorProxy>>> &predecessors, const std::vector<StateID> &frontier,
                                   std::unordered_set<StateID> &&closed,
-                                  PerStateInformation<ShiftedDistribution> *beliefs) const
+                                  PerStateInformation<ShiftedDistribution> *beliefs,
+                                  PerStateInformation<ShiftedDistribution> *post_beliefs) const
 {
 	auto learning_queue = std::priority_queue<LearningQueueEntry, std::vector<LearningQueueEntry>, LearningQueueComp>();
 
@@ -93,8 +95,18 @@ void NancyLearning::apply_updates(const std::unordered_map<StateID,
         //   current state's expected value + the operator cost which is
         //   the same as the expected value of the raw distribution + shift
         closed.erase(cls);
+
+        // backup the main belief
         ShiftedDistribution &p_belief = (*beliefs)[predecessor];
         p_belief.set(dstr.distribution, dstr.shift + op.get_cost());
+
+        // backup the post expansion belief
+        ShiftedDistribution &p_post_belief = (*post_beliefs)[predecessor];
+        ShiftedDistribution &s_post_belief = (*post_beliefs)[state];
+        assert(dstr.shift == s_post_belief.shift);
+        assert(s_post_belief.distribution);
+        p_post_belief.set(s_post_belief.distribution, s_post_belief.shift + op.get_cost());
+
         assert(std::abs(new_exp - p_belief.expected_cost()) < 0.001);
         learning_queue.emplace(p_belief, p_id);
       }

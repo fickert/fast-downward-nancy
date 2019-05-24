@@ -61,79 +61,83 @@ ShiftedDistribution RiskLookaheadSearch::node_belief(SearchNode const &node)
   int h = eval_context.get_evaluator_value(base_heuristic.get());
   if (static_cast<size_t>(h) >= raw_beliefs.size()) {
     raw_beliefs.resize(h+1);
-  }
-  DiscreteDistribution *distribution = raw_beliefs[h];
-  if (nullptr != distribution) {
-    belief.set(distribution, 0);
-    beliefs[state] = belief;
-    return belief;
-  }
-
-  // if not, create the distribution for this h-value based on data,
-  // or using gauss, cache it, and assign the state's belief to it.
-  if (hstar_data) {
-    const auto hstar_data_it = hstar_data->find(h);
-    if (hstar_data_it != std::end(*hstar_data)) {
-      distribution = new DiscreteDistribution(MAX_SAMPLES, hstar_data_it->second);
-      raw_beliefs[h] = distribution;
-      belief.set(distribution, 0);
-      beliefs[state] = belief;
-      return belief;
-    }
-    ++hstar_gaussian_fallback_count;
-  }
-  const auto f = eval_context.get_evaluator_value_or_infinity(f_evaluator.get());
-  assert(f != EvaluationResult::INFTY);
-  const auto f_hat = eval_context.get_evaluator_value_or_infinity(f_hat_evaluator.get());
-  assert(f_hat != EvaluationResult::INFTY);
-  const auto d = eval_context.get_evaluator_value_or_infinity(distance_heuristic.get());
-  assert(d != EvaluationResult::INFTY);
-  distribution = new DiscreteDistribution(MAX_SAMPLES, f, f_hat, d, f_hat - f);
-  raw_beliefs[h] = distribution;
-  belief.set(distribution, 0);
-  beliefs[state] = belief;
-  return belief;
-}
-
-// TODO: store post expansion beliefs
-ShiftedDistribution RiskLookaheadSearch::post_expansion_belief(StateID best_state_id, ShiftedDistribution const *current_belief)
-{
-  auto eval_context = EvaluationContext(state_registry.lookup_state(best_state_id), -1, false, nullptr);
-  int h = eval_context.get_evaluator_value(base_heuristic.get());
-
-  if (static_cast<size_t>(h) >= raw_post_beliefs.size()) {
     raw_post_beliefs.resize(h+1);
   }
 
-  DiscreteDistribution *distribution = raw_post_beliefs[h];
-  ShiftedDistribution belief;
-  if (distribution != nullptr) {
-    belief.set(distribution, current_belief->shift);
-    return belief;
-  }
+  bool has_data;
 
-  if (post_expansion_belief_data) {
-    const auto post_expansion_belief_data_it = post_expansion_belief_data->find(h);
-    if (post_expansion_belief_data_it != std::end(*post_expansion_belief_data)) {
-      distribution = new DiscreteDistribution(MAX_SAMPLES, post_expansion_belief_data_it->second);
-      raw_post_beliefs[h] = distribution;
-      belief.set(distribution, current_belief->shift);
-      return belief;
+  DiscreteDistribution *distribution = raw_beliefs[h];
+  if (!distribution) {
+    // if not, create the distribution for this h-value based on data,
+    // or using gauss, cache it, and assign the state's belief to it.
+    has_data = false;
+    if (hstar_data) {
+      const auto hstar_data_it = hstar_data->find(h);
+      if (hstar_data_it != std::end(*hstar_data)) {
+        has_data = true;
+        distribution = new DiscreteDistribution(MAX_SAMPLES, hstar_data_it->second);
+        raw_beliefs[h] = distribution;
+      }
     }
-    ++post_expansion_belief_gaussian_fallback_count;
+    if (!has_data) {
+      ++hstar_gaussian_fallback_count;
+      const auto f = eval_context.get_evaluator_value_or_infinity(f_evaluator.get());
+      assert(f != EvaluationResult::INFTY);
+      const auto f_hat = eval_context.get_evaluator_value_or_infinity(f_hat_evaluator.get());
+      assert(f_hat != EvaluationResult::INFTY);
+      const auto d = eval_context.get_evaluator_value_or_infinity(distance_heuristic.get());
+      assert(d != EvaluationResult::INFTY);
+      distribution = new DiscreteDistribution(MAX_SAMPLES, f, f_hat, d, f_hat - f);
+      raw_beliefs[h] = distribution;
+    }
   }
-  // Belief of TLA is squished as a result of search. Mean stays the same, but variance is decreased by a factor based on expansion delay.
-  double ds = 1 / expansion_delay->get_avg_expansion_delay();
-  auto best_state_eval_context = EvaluationContext(state_registry.lookup_state(best_state_id), -1, false, nullptr);
-  assert(!best_state_eval_context.is_evaluator_value_infinite(distance_heuristic.get()));
-  double dy = best_state_eval_context.get_evaluator_value(distance_heuristic.get());
-  double squishFactor = min(1.0, (ds / dy));
-  // make a copied instance of the current distribution, because the
-  // original one must not be changed
-  distribution = new DiscreteDistribution(current_belief->distribution);
-  distribution->squish(squishFactor);
-  belief.set(distribution, current_belief->shift);
+  belief.set(distribution, 0);
+  beliefs[state] = belief;
+
+  // It's more convenient to look up the post expansions belief here
+  // already.  This way we can be sure that both beliefs are always
+  // present.
+  ShiftedDistribution post_belief;
+  DiscreteDistribution *post_distribution = raw_post_beliefs[h];
+  if (!post_distribution) {
+    has_data = false;
+    if (post_expansion_belief_data) {
+      const auto post_data_it = post_expansion_belief_data->find(h);
+      if (post_data_it != std::end(*post_expansion_belief_data)) {
+        has_data = true;
+        post_distribution = new DiscreteDistribution(MAX_SAMPLES, post_data_it->second);
+        raw_post_beliefs[h] = post_distribution;
+      }
+    }
+    if (!has_data) {
+      ++post_expansion_belief_gaussian_fallback_count;
+      double ds = 1 / expansion_delay->get_avg_expansion_delay();
+      auto eval_context = EvaluationContext(state_registry.lookup_state(state.get_id()), -1, false, nullptr);
+      assert(!eval_context.is_evaluator_value_infinite(distance_heuristic.get()));
+      double dy = eval_context.get_evaluator_value(distance_heuristic.get());
+      double squishFactor = min(1.0, (ds / dy));
+      // needs to be a copy, because these are separate distributions
+      post_distribution = new DiscreteDistribution(distribution);
+      post_distribution->squish(squishFactor);
+    }
+  }
+  post_belief.set(post_distribution, 0);
+  post_beliefs[state] = post_belief;
+
+  assert(belief.distribution);
+  assert(post_belief.distribution);
+
   return belief;
+}
+
+// Post expansion belief is generated when a node is created.  It is
+// therefore guaranteed to be cached already.
+ShiftedDistribution RiskLookaheadSearch::post_expansion_belief(StateID state_id)
+{
+  auto const &state = state_registry.lookup_state(state_id);
+  ShiftedDistribution post_belief = post_beliefs[state];
+  assert(post_belief.distribution);
+  return post_belief;
 }
 
 size_t TLAs::size() const
@@ -207,6 +211,7 @@ void RiskLookaheadSearch::generate_tlas(GlobalState const &current_state)
 
     // add the belief
     tlas.beliefs.push_back(node_belief(succ_node));
+    tlas.post_beliefs.push_back(post_expansion_belief(succ_state.get_id()));
 
     // add the node to this tla's open list
     tlas.open_lists.emplace_back();
@@ -247,7 +252,7 @@ void RiskLookaheadSearch::initialize(const GlobalState &initial_state)
     closed.emplace(initial_state.get_id());
 }
 
-double RiskLookaheadSearch::risk_analysis(size_t const alpha, const vector<ShiftedDistribution> &beliefs) const
+double RiskLookaheadSearch::risk_analysis(size_t const alpha, const vector<ShiftedDistribution> &est_beliefs) const
 {
   double risk = 0.0;
 
@@ -256,13 +261,14 @@ double RiskLookaheadSearch::risk_analysis(size_t const alpha, const vector<Shift
   // integrate over probability nodes in beta's belief
   // add to risk if beta cost is smaller than alpha cost
   // => risk is proportional to the chance that alpha isn't the optimal choice
-  for (auto const &a : *beliefs[alpha].distribution) {
-    double shifted_a_cost = a.cost + beliefs[alpha].shift;
+  for (auto const &a : *est_beliefs[alpha].distribution) {
+    double shifted_a_cost = a.cost + est_beliefs[alpha].shift;
     for (size_t beta = 0; beta < tlas.size(); ++beta) {
+      assert(est_beliefs[beta].distribution != nullptr);
       if (alpha == beta)
         continue;
-      for (auto const &b : *beliefs[beta].distribution) {
-        double shifted_b_cost = b.cost + beliefs[beta].shift;
+      for (auto const &b : *est_beliefs[beta].distribution) {
+        double shifted_b_cost = b.cost + est_beliefs[beta].shift;
         if (shifted_b_cost < shifted_a_cost)
           risk += a.probability * b.probability * (shifted_a_cost - shifted_b_cost);
         else
@@ -295,15 +301,16 @@ size_t RiskLookaheadSearch::select_tla()
     }
     assert(expansion_delay);
     // Simulate how expanding this TLA's best node would affect its belief
-    ShiftedDistribution post_i = post_expansion_belief(tlas.open_lists[i].top().second, &tlas.beliefs[i]);
+    assert(tlas.post_beliefs[i].expected_cost() == post_expansion_belief(tlas.open_lists[i].top().second).expected_cost());
+    ShiftedDistribution post_i = tlas.post_beliefs[i];
+    assert(post_i.distribution);
     // swap in the estimated post expansion belief
     ShiftedDistribution tmp = tlas.beliefs[i];
+    assert(tmp.distribution);
     tlas.beliefs[i] = post_i;
     double risk = risk_analysis(alpha, tlas.beliefs);
     // restore the previous one
     tlas.beliefs[i] = tmp;
-    delete post_i.distribution;
-    post_i.distribution = nullptr;
 
     // keep the minimum risk tla.
     // otherwise tie-break f_hat -> f -> g
@@ -364,7 +371,9 @@ void RiskLookaheadSearch::backup_beliefs()
         auto best_node = search_space->get_node(best_state);
         // compute belief, or lookup if new
         tlas.beliefs[tla_id] = node_belief(best_node);
+        tlas.post_beliefs[tla_id] = post_expansion_belief(state_id);
         assert(tlas.beliefs[tla_id].distribution != nullptr);
+        assert(tlas.post_beliefs[tla_id].distribution != nullptr);
         break;
       } else {
         tlas.remove_min(tla_id);
@@ -522,6 +531,9 @@ RiskLookaheadSearch::RiskLookaheadSearch(StateRegistry &state_registry, int look
 RiskLookaheadSearch::~RiskLookaheadSearch()
 {
   for (auto b : raw_beliefs) {
+    delete b;
+  }
+  for (auto b : raw_post_beliefs) {
     delete b;
   }
 }

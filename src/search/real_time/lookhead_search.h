@@ -75,6 +75,7 @@ public:
 
   // only implemented for lookahead search methods making use of distributions (risk)
   virtual auto get_beliefs() -> PerStateInformation<ShiftedDistribution> * { return nullptr; }
+  virtual auto get_post_beliefs() -> PerStateInformation<ShiftedDistribution> * { return nullptr; }
 };
 
 class EagerLookaheadSearch : public LookaheadSearch {

@@ -46,6 +46,7 @@ RealTimeSearch::RealTimeSearch(const options::Options &opts)
     break;
   }
   bool const store_exploration_data = learning_method != LearningMethod::NONE;
+  //bool const store_exploration_data = true;
 
 	switch (LookaheadSearchMethod(opts.get_enum("lookahead_search"))) {
 	case LookaheadSearchMethod::A_STAR:
@@ -178,8 +179,10 @@ SearchStatus RealTimeSearch::step() {
   case LearningMethod::NANCY:
     {
       auto beliefs = lookahead_search->get_beliefs();
+      auto post_beliefs = lookahead_search->get_post_beliefs();
       assert(beliefs != nullptr);
-      nancy_learning->apply_updates(lookahead_search->get_predecessors(), lookahead_search->get_frontier(), lookahead_search->get_closed(), beliefs);
+      assert(post_beliefs != nullptr);
+      nancy_learning->apply_updates(lookahead_search->get_predecessors(), lookahead_search->get_frontier(), lookahead_search->get_closed(), beliefs, post_beliefs);
     }
     break;
   }
