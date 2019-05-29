@@ -457,7 +457,7 @@ SearchStatus RiskLookaheadSearch::search()
         }
         succ_node.open(node, op, op.get_cost());
         auto belief = node_belief(succ_node);
-        tlas.open_lists[tla_id].emplace(belief.expected_cost(), succ_state.get_id());
+        tlas.open_lists[tla_id].emplace(static_cast<double>(node.get_g()) + belief.expected_cost(), succ_state.get_id());
         make_state_owner(state_owners, succ_state.get_id(), tla_id);
       } else {
         auto const new_g = node.get_g() + op.get_cost();
@@ -467,7 +467,7 @@ SearchStatus RiskLookaheadSearch::search()
             statistics->inc_reopened();
           succ_node.reopen(node, op, op.get_cost());
           auto belief = node_belief(succ_node);
-          tlas.open_lists[tla_id].emplace(belief.expected_cost(), succ_state.get_id());
+          tlas.open_lists[tla_id].emplace(static_cast<double>(new_g) + belief.expected_cost(), succ_state.get_id());
 
           if (old_g != new_g) {
             // new cheapest path to this state
