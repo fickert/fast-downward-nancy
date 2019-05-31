@@ -17,19 +17,26 @@
 namespace real_time
 {
 
-// struct QueueEntryCompare
-// {
-
-// };
+struct NodeEvaluation
+{
+  double expected;
+  int h;
+  NodeEvaluation(double d, int i) : expected(d), h(i) {}
+  ~NodeEvaluation() {}
+};
 
 struct TLAs
 {
-  using QueueEntry = std::pair<double, StateID>;
+  using QueueEntry = std::pair<NodeEvaluation, StateID>;
   using QueueEntryCompare =
     struct {
-      bool operator()(std::pair<double, StateID> const &l, std::pair<double, StateID> const &r) const
+      bool operator()(QueueEntry const &l, QueueEntry const &r) const
       {
-       return l.first < r.first;
+       // compare by expected value, with h as tie breaker
+       if (l.first.expected != r.first.expected)
+         return l.first.expected > r.first.expected;
+       else
+         return l.first.h > r.first.h;
       }
     };
   using Queue =

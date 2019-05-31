@@ -215,7 +215,10 @@ void RiskLookaheadSearch::generate_tlas(GlobalState const &current_state)
 
     // add the node to this tla's open list
     tlas.open_lists.emplace_back();
-    tlas.open_lists.back().emplace(static_cast<double>(succ_node.get_g()) + tlas.beliefs.back().expected_cost(), succ_state.get_id());
+    tlas.open_lists.back().emplace(NodeEvaluation(static_cast<double>(succ_node.get_g())
+                                                  + tlas.beliefs.back().expected_cost(),
+                                                  eval_context.get_result(heuristic.get()).get_evaluator_value()),
+                                   succ_state.get_id());
 
     // add the context for the tla's state
     tlas.eval_contexts.emplace_back(std::move(eval_context));
@@ -457,7 +460,10 @@ SearchStatus RiskLookaheadSearch::search()
         }
         succ_node.open(node, op, op.get_cost());
         auto belief = node_belief(succ_node);
-        tlas.open_lists[tla_id].emplace(static_cast<double>(node.get_g()) + belief.expected_cost(), succ_state.get_id());
+        tlas.open_lists[tla_id].emplace(NodeEvaluation(static_cast<double>(node.get_g())
+                                                       + belief.expected_cost(),
+                                                       eval_context.get_result(heuristic.get()).get_evaluator_value()),
+                                        succ_state.get_id());
         make_state_owner(state_owners, succ_state.get_id(), tla_id);
       } else {
         auto const new_g = node.get_g() + op.get_cost();
@@ -467,7 +473,10 @@ SearchStatus RiskLookaheadSearch::search()
             statistics->inc_reopened();
           succ_node.reopen(node, op, op.get_cost());
           auto belief = node_belief(succ_node);
-          tlas.open_lists[tla_id].emplace(static_cast<double>(new_g) + belief.expected_cost(), succ_state.get_id());
+          tlas.open_lists[tla_id].emplace(NodeEvaluation(static_cast<double>(node.get_g())
+                                                       + belief.expected_cost(),
+                                                         eval_context.get_result(heuristic.get()).get_evaluator_value()),
+                                          succ_state.get_id());
 
           if (old_g != new_g) {
             // new cheapest path to this state

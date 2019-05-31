@@ -25,19 +25,12 @@ void NancyLearning::apply_updates(const std::unordered_map<StateID,
 
 
 using LearningQueueEntry = std::pair<ShiftedDistribution, StateID>;
-struct ShiftedDistributionComp
-{
-  bool operator()(const ShiftedDistribution &a, const ShiftedDistribution &b) const
-  {
-    return a.expected_cost() < b.expected_cost();
-  }
-};
 
 struct LearningQueueComp
 {
   bool operator()(const LearningQueueEntry &a, const LearningQueueEntry &b) const
   {
-    return ShiftedDistributionComp()(a.first, b.first);
+    return a.first.expected_cost() >  b.first.expected_cost();
   }
 };
 
