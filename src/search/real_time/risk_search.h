@@ -17,6 +17,8 @@
 namespace real_time
 {
 
+// This struct is used in the open list to sort nodes by expected
+// value, with h as tie breaker.
 struct NodeEvaluation
 {
   double expected;
@@ -32,7 +34,6 @@ struct TLAs
     struct {
       bool operator()(QueueEntry const &l, QueueEntry const &r) const
       {
-       // compare by expected value, with h as tie breaker
        if (l.first.expected != r.first.expected)
          return l.first.expected > r.first.expected;
        else
@@ -109,7 +110,6 @@ class RiskLookaheadSearch : public LookaheadSearch
   // more efficient than creating a new one each iteration
   std::vector<OperatorID> applicables;
 protected:
-  void generate_tlas(GlobalState const &current_state);
   //std::unique_ptr<StateOpenList> create_open_list() const;
   double risk_analysis(std::size_t const alpha, const vector<ShiftedDistribution> &beliefs) const;
   std::size_t select_tla();

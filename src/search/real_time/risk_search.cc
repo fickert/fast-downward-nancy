@@ -7,8 +7,6 @@
 #include "../options/plugin.h"
 #include "../task_utils/task_properties.h"
 
-#include <iostream>
-
 namespace real_time
 {
 
@@ -179,19 +177,23 @@ StateID TLAs::remove_min(size_t tla_id)
   return res;
 }
 
-void RiskLookaheadSearch::generate_tlas(GlobalState const &current_state)
+void RiskLookaheadSearch::initialize(const GlobalState &initial_state)
 {
+  LookaheadSearch::initialize(initial_state);
+
+  // generate tlas
+
   tlas.clear();
   state_owners.clear();
   if (heuristic_error)
-    heuristic_error->set_expanding_state(current_state);
+    heuristic_error->set_expanding_state(initial_state);
   auto ops = std::vector<OperatorID>();
-  successor_generator.generate_applicable_ops(current_state, ops);
-  auto root_node = search_space->get_node(current_state);
+  successor_generator.generate_applicable_ops(initial_state, ops);
+  auto root_node = search_space->get_node(initial_state);
 
   for (auto op_id : ops) {
     auto const op = task_proxy.get_operators()[op_id];
-    auto const succ_state = state_registry.get_successor_state(current_state, op);
+    auto const succ_state = state_registry.get_successor_state(initial_state, op);
     auto succ_node = search_space->get_node(succ_state);
     if (succ_node.is_new())
       succ_node.open(root_node, op, op.get_cost());
@@ -236,23 +238,12 @@ void RiskLookaheadSearch::generate_tlas(GlobalState const &current_state)
     if (heuristic_error)
       heuristic_error->add_successor(succ_node, op.get_cost());
   }
-  root_node.close();
-  if (heuristic_error)
-    heuristic_error->update_error();
-}
 
-void RiskLookaheadSearch::initialize(const GlobalState &initial_state)
-{
-  LookaheadSearch::initialize(initial_state);
-
-  // generate top level actions
-  generate_tlas(initial_state);
-  // because we manually opened and expanded the initial state to generate the tlas
-  statistics->inc_expanded();
+  mark_expanded(root_node);
   statistics->inc_generated(tlas.size());
 
-  if (store_exploration_data)
-    closed.emplace(initial_state.get_id());
+  if (heuristic_error)
+    heuristic_error->update_error();
 }
 
 double RiskLookaheadSearch::risk_analysis(size_t const alpha, const vector<ShiftedDistribution> &est_beliefs) const
@@ -389,7 +380,6 @@ SearchStatus RiskLookaheadSearch::search()
 {
   assert(statistics);
   while (statistics->get_expanded() < lookahead_bound) {
-
     if (tlas.size() == 0u) {
       return FAILED;
     }
@@ -410,7 +400,6 @@ SearchStatus RiskLookaheadSearch::search()
       if (state_owned_by_tla(state_owners, state_id, tla_id))
         break;
       if (tlas.open_lists[tla_id].empty()) {
-        std::cout << "no owned nodes in open lists under tla\n";
         return FAILED;
       }
       state_id = tlas.remove_min(tla_id);
@@ -466,9 +455,9 @@ SearchStatus RiskLookaheadSearch::search()
                                         succ_state.get_id());
         make_state_owner(state_owners, succ_state.get_id(), tla_id);
       } else {
-        auto const new_g = node.get_g() + op.get_cost();
         auto const old_g = succ_node.get_g();
-        if (old_g >= new_g) {
+        auto const new_g = node.get_g() + op.get_cost();
+        if (old_g > new_g) {
           if (succ_node.is_closed())
             statistics->inc_reopened();
           succ_node.reopen(node, op, op.get_cost());

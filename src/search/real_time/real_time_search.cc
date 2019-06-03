@@ -9,6 +9,8 @@
 #include "DiscreteDistribution.h"
 #include "risk_search.h"
 
+#include <iostream>
+
 namespace real_time {
 
 RealTimeSearch::RealTimeSearch(const options::Options &opts)
