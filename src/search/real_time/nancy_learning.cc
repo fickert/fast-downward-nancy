@@ -91,14 +91,14 @@ void NancyLearning::apply_updates(const std::unordered_map<StateID,
 
         // backup the main belief
         ShiftedDistribution &p_belief = (*beliefs)[predecessor];
-        p_belief.set(dstr.distribution, dstr.shift + op.get_cost());
+        p_belief.set_and_shift(dstr, op.get_cost());
 
         // backup the post expansion belief
         ShiftedDistribution &p_post_belief = (*post_beliefs)[predecessor];
         ShiftedDistribution &s_post_belief = (*post_beliefs)[state];
         assert(dstr.shift == s_post_belief.shift);
         assert(s_post_belief.distribution);
-        p_post_belief.set(s_post_belief.distribution, s_post_belief.shift + op.get_cost());
+        p_post_belief.set_and_shift(s_post_belief, op.get_cost());
 
         assert(std::abs(new_exp - p_belief.expected_cost()) < 0.001);
         learning_queue.emplace(p_belief, p_id);

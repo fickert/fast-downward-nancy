@@ -537,3 +537,16 @@ void ShiftedDistribution::set(DiscreteDistribution const *d, int s)
   // Always remember, the expected value is linear.
   this->expected_value = d->expectedCost() + this->shift;
 }
+
+void ShiftedDistribution::set(const DiscreteDistribution *d, double e, int s)
+{
+  this->distribution = d;
+  this->expected_value = e;
+  this->shift = s;
+  assert(std::abs((d->expectedCost() + s) - e) < 0.00001);
+}
+
+void ShiftedDistribution::set_and_shift(const ShiftedDistribution &d, int shift)
+{
+  set(d.distribution, d.expected_value + shift, d.shift + shift);
+}

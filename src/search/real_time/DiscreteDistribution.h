@@ -99,6 +99,10 @@ struct ShiftedDistribution
 
   double expected_cost() const;
   void set(const DiscreteDistribution *distribution, int shift);
+  void set_and_shift(const ShiftedDistribution &d, int shift);
+
+private:
+  void set(const DiscreteDistribution *distribution, double exp_value, int shift);
 };
 
 template<class count_type>
