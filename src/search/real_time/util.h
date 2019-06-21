@@ -13,7 +13,7 @@
 
 namespace real_time {
 
-static constexpr auto MAX_SAMPLES = 100;
+static constexpr auto MAX_SAMPLES = 64;
 
 template<class count_type = int>
 struct hstar_sample {
@@ -38,6 +38,11 @@ auto read_hstar_data(const std::string &file_name) -> hstar_data_type<count_type
 	int h, hs;
 	count_type valueCount, hsCount;
 
+  // TODO: this is actually worth optimizing since we have lots of
+  // data. in my medium sized transport test instance, perf reports
+  // that 15% of the time is spent parsing (in calls to
+  // std::istream::operator>>, std::num_get<char>, and other istream
+  // functions).  a custom parser would probably be more efficient.
 	while (std::getline(f, line)) {
 		std::stringstream ss(line);
 		ss >> h;
