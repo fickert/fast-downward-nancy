@@ -45,6 +45,9 @@ struct CompareDistance
   }
 };
 
+// TODO: the expected cost could be computed and stored during
+// construction.  We always need it anyway when dealing with
+// distributions.  (ShiftedDistribution already does it that way).
 class DiscreteDistribution
 {
   std::vector<ProbabilityNode> distribution;
@@ -86,6 +89,7 @@ public:
   std::vector<ProbabilityNode>::const_iterator end() const;
 };
 
+
 // The belief for a state is a distribution and an offset.  Since the
 // distribution itself never changes after its creation, it can be
 // shared for all states, and we can just keep a pointer to it.
@@ -104,6 +108,12 @@ struct ShiftedDistribution
 private:
   void set(const DiscreteDistribution *distribution, double exp_value, int shift);
 };
+
+double variance(DiscreteDistribution const &d);
+double variance(ShiftedDistribution const &d);
+
+std::pair<double, double> variance_and_stddev(DiscreteDistribution const &);
+std::pair<double, double> variance_and_stddev(ShiftedDistribution const &);
 
 template<class count_type>
 DiscreteDistribution::DiscreteDistribution(int maxSamples, const real_time::hstar_data_entry<count_type> &hstar_data)

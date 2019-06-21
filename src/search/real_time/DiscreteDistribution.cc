@@ -452,6 +452,46 @@ double DiscreteDistribution::expectedCost() const
   return E;
 }
 
+
+
+double variance(DiscreteDistribution const &d)
+{
+  // Var[x] = E[X^2] - E^2[X]
+  double e = d.expectedCost();
+  double e2x = e * e;
+  double ex2 = 0.0;
+  for (auto const &n : d) {
+    ex2 += n.cost * n.cost * n.probability;
+  }
+  return ex2 - e2x;
+}
+
+double variance(ShiftedDistribution const &d)
+{
+  // Var[x] = E[X^2] - E^2[X]
+  double e = d.expected_cost();
+  double e2x = e * e;
+  double ex2 = 0.0;
+  for (auto const &n : *d.distribution) {
+    double sh_cost = n.cost + d.shift;
+    ex2 += (sh_cost * sh_cost) * n.probability;
+  }
+  return ex2 - e2x;
+}
+
+
+std::pair<double, double> variance_and_stddev(DiscreteDistribution const &d)
+{
+  double v = variance(d);
+  return std::make_pair(v, std::sqrt(v));
+}
+
+std::pair<double, double> variance_and_stddev(ShiftedDistribution const &d)
+{
+  double v = variance(d);
+  return std::make_pair(v, std::sqrt(v));
+}
+
 DiscreteDistribution& DiscreteDistribution::operator=(const DiscreteDistribution& rhs)
 {
   if (&rhs == this) {
