@@ -41,6 +41,17 @@ double DiscreteDistribution::probabilityDensityFunction(double x, double mu, dou
   return ((1 / std::sqrt(2 * M_PI * var)) * std::exp(-(std::pow(x - mu, 2) / (2 * var))));
 }
 
+
+bool DiscreteDistribution::is_sorted() const
+{
+  for (size_t i = 1; i < distribution.size(); ++i) {
+    if (distribution[i].cost < distribution[i-1].cost) {
+      return false;
+    }
+  }
+  return true;
+}
+
 void DiscreteDistribution::resize(map<double, double>& distroMap)
 {
   // Maybe we don't need to merge any buckets...
@@ -127,9 +138,10 @@ void DiscreteDistribution::resize(map<double, double>& distroMap)
 DiscreteDistribution::DiscreteDistribution(int maxSamples, double f, double mean, double d, double error)
   : maxSamples(maxSamples)
 {
+  // std::cout << "fallback distribution constructor\n";
   // This is a goal node, belief is a spike at true value
   if (d == 0) {
-    distribution.insert(ProbabilityNode(mean, 1.0));
+    distribution.push_back(ProbabilityNode(mean, 1.0));
     return;
   }
 
@@ -139,14 +151,16 @@ DiscreteDistribution::DiscreteDistribution(int maxSamples, double f, double mean
   // Create a Discrete Distribution from a gaussian
   double lower = f;
   double upper = mean + 3 * stdDev;
+  if (lower > upper)
+    std::swap(lower, upper);
 
   double sampleStepSize = (upper - lower) / maxSamples;
 
   double currentX = lower;
 
-  double probSum = 0.0;
+  //std::cout << f << ", " << mean << ", " << stdDev << ", " << var << ", " << lower << ", " << upper << "\n";
 
-  vector<ProbabilityNode> tmp;
+  double probSum = 0.0;
 
   // Take the samples and build the discrete distribution
   for (int i = 0; i < maxSamples; i++) {
@@ -161,17 +175,20 @@ DiscreteDistribution::DiscreteDistribution(int maxSamples, double f, double mean
 
     ProbabilityNode node(currentX, prob);
 
-    tmp.push_back(node);
+    distribution.push_back(node);
 
     currentX += sampleStepSize;
   }
 
   // Normalize the distribution probabilities
-  for (ProbabilityNode& n : tmp) {
-    if (probSum > 0.0 && n.probability != 1.0)
-      n.probability = n.probability / probSum;
-    distribution.insert(n);
+  if (probSum > 0.0) {
+    for (ProbabilityNode& n : distribution) {
+      if (n.probability < 1.0)
+        n.probability = n.probability / probSum;
+    }
   }
+
+  //assert(is_sorted());
 }
 
 // Creates a discrete distribution based on Pemberton's belief distribution, a uniform between 0 and 1, offset by some g-value
@@ -180,7 +197,7 @@ DiscreteDistribution::DiscreteDistribution(int maxSamples, double g, double d)
 {
   // This is a goal node, belief is a spike at true value
   if (d == 0) {
-    distribution.insert(ProbabilityNode(g, 1.0));
+    distribution.push_back(ProbabilityNode(g, 1.0));
     return;
   }
 
@@ -208,7 +225,7 @@ DiscreteDistribution::DiscreteDistribution(int maxSamples, double g, double d)
   // Normalize the distribution probabilities
   for (ProbabilityNode& n : tmp) {
     n.probability = n.probability / sum;
-    distribution.insert(n);
+    distribution.push_back(n);
   }
 }
 
@@ -225,7 +242,7 @@ DiscreteDistribution::DiscreteDistribution(int maxSamples, double g, double d, i
 
   // This is a goal node, belief is a spike at true value
   if (d == 0) {
-    distribution.insert(ProbabilityNode(g, 1.0));
+    distribution.push_back(ProbabilityNode(g, 1.0));
     return;
   }
 
@@ -242,7 +259,7 @@ DiscreteDistribution::DiscreteDistribution(int maxSamples, double g, double d, i
     ProbabilityNode node(currentX + g, sampleStepSize);
 
     for (DiscreteDistribution& uniform : uniforms)
-      uniform.distribution.insert(node);
+      uniform.distribution.push_back(node);
 
     currentX += sampleStepSize;
   }
@@ -260,14 +277,14 @@ DiscreteDistribution::DiscreteDistribution(int maxSamples, double g, double d, i
 DiscreteDistribution::DiscreteDistribution(int maxSamples, double deltaSpikeValue)
   : maxSamples(maxSamples)
 {
-  distribution.insert(ProbabilityNode(deltaSpikeValue, 1.0));
+  distribution.push_back(ProbabilityNode(deltaSpikeValue, 1.0));
 }
 
 DiscreteDistribution::DiscreteDistribution(DiscreteDistribution const *other)
   :maxSamples(other->maxSamples)
 {
   for (ProbabilityNode n : other->distribution) {
-    distribution.insert(n);
+    distribution.push_back(n);
   }
 }
 
@@ -282,7 +299,7 @@ DiscreteDistribution::DiscreteDistribution(double g, double h, bool& retSuccess)
 
   for (auto& probNode : probNodeList) {
     probNode.cost += g;
-    distribution.insert(probNode);
+    distribution.push_back(probNode);
   }
 
   retSuccess = true;
@@ -296,7 +313,7 @@ void DiscreteDistribution::createFromUniform(int maxSamples, double g, double d)
 
   // This is a goal node, belief is a spike at true value
   if (d == 0) {
-    distribution.insert(ProbabilityNode(g, 1.0));
+    distribution.push_back(ProbabilityNode(g, 1.0));
     return;
   }
 
@@ -314,7 +331,7 @@ void DiscreteDistribution::createFromUniform(int maxSamples, double g, double d)
   for (int i = 0; i < maxSamples; i++) {
     ProbabilityNode node(currentX, probStep);
 
-    distribution.insert(node);
+    distribution.push_back(node);
 
     currentX += sampleStepSize;
   }
@@ -327,7 +344,7 @@ void DiscreteDistribution::createFromGaussian(double f, double mean, double d, d
 
   // This is a goal node, belief is a spike at true value
   if (d == 0) {
-    distribution.insert(ProbabilityNode(mean, 1.0));
+    distribution.push_back(ProbabilityNode(mean, 1.0));
     return;
   }
 
@@ -367,18 +384,19 @@ void DiscreteDistribution::createFromGaussian(double f, double mean, double d, d
   // Normalize the distribution probabilities
   for (ProbabilityNode& n : tmp) {
     n.probability = n.probability / probSum;
-    distribution.insert(n);
+    distribution.push_back(n);
   }
 }
 
+// TODO: doesn't matter if we're using data anyway, but this is a little inefficient
 DiscreteDistribution& DiscreteDistribution::squish(double factor)
 {
-  set<ProbabilityNode> newDistribution;
+  std::vector<ProbabilityNode> newDistribution;
   double mean = expectedCost();
 
   // If the squish factor is 1, all values in distribution will be moved to the mean.
   if (factor == 1) {
-    newDistribution.insert(ProbabilityNode(mean, 1.0));
+    newDistribution.push_back(ProbabilityNode(mean, 1.0));
     distribution.clear();
     distribution = newDistribution;
 
@@ -386,12 +404,12 @@ DiscreteDistribution& DiscreteDistribution::squish(double factor)
   }
 
   /*
-		cout << "Before Squish Cost,Before Squish Probability" << endl;
-		for (ProbabilityNode n : distribution)
-		{
+    cout << "Before Squish Cost,Before Squish Probability" << endl;
+    for (ProbabilityNode n : distribution)
+    {
     cout << n.cost << "," << n.probability << endl;
-		}
-		cout << endl;
+    }
+    cout << endl;
   */
 
   for (ProbabilityNode n : distribution) {
@@ -405,19 +423,19 @@ DiscreteDistribution& DiscreteDistribution::squish(double factor)
     else if (shiftedCost < mean)
       shiftedCost += distanceToShift;
 
-    newDistribution.insert(ProbabilityNode(shiftedCost, n.probability));
+    newDistribution.push_back(ProbabilityNode(shiftedCost, n.probability));
   }
 
   distribution.clear();
   distribution = newDistribution;
 
   /*
-		cout << "Squish Cost,Squish Probability" << endl;
-		for (ProbabilityNode n : distribution)
-		{
+    cout << "Squish Cost,Squish Probability" << endl;
+    for (ProbabilityNode n : distribution)
+    {
     cout << n.cost << "," << n.probability << endl;
-		}
-		cout << endl;
+    }
+    cout << endl;
   */
 
   return *this;
@@ -467,59 +485,59 @@ DiscreteDistribution DiscreteDistribution::operator*(const DiscreteDistribution&
   csernaDistro.resize(results);
 
   for (map<double, double>::iterator it = results.begin(); it != results.end(); it++) {
-    csernaDistro.distribution.insert(ProbabilityNode(it->first, it->second));
+    csernaDistro.distribution.push_back(ProbabilityNode(it->first, it->second));
   }
 
   /*
-		cout << csernaDistro.expectedCost() << endl;
-		double cdf;
-		cout << "Path Cost Node 1,Probability Node 1,CDF Node 1" << endl;
-		cdf = 0.0;
-		for (ProbabilityNode n1 : distribution)
-		{
+    cout << csernaDistro.expectedCost() << endl;
+    double cdf;
+    cout << "Path Cost Node 1,Probability Node 1,CDF Node 1" << endl;
+    cdf = 0.0;
+    for (ProbabilityNode n1 : distribution)
+    {
     cdf += n1.probability;
     cout << n1.cost << "," << n1.probability << "," << cdf << endl;
-		}
-		cout << endl << endl;
-		cout << "Path Cost Node 2,Probability Node 2,CDF Node 2" << endl;
-		cdf = 0.0;
-		for (ProbabilityNode n1 : rhs.distribution)
-		{
+    }
+    cout << endl << endl;
+    cout << "Path Cost Node 2,Probability Node 2,CDF Node 2" << endl;
+    cdf = 0.0;
+    for (ProbabilityNode n1 : rhs.distribution)
+    {
     cdf += n1.probability;
     cout << n1.cost << "," << n1.probability << "," << cdf << endl;
-		}
-		cout << endl << endl;
-		cout << "Path Cost Cserna,Probability Cserna,CDF Cserna" << endl;
-		cdf = 0.0;
-		for (ProbabilityNode n1 : csernaDistro.distribution)
-		{
+    }
+    cout << endl << endl;
+    cout << "Path Cost Cserna,Probability Cserna,CDF Cserna" << endl;
+    cdf = 0.0;
+    for (ProbabilityNode n1 : csernaDistro.distribution)
+    {
     cdf += n1.probability;
     cout << n1.cost << "," << n1.probability << "," << cdf << endl;
-		}
-		cout << endl << endl;
-		exit(1);
+    }
+    cout << endl << endl;
+    exit(1);
   */
 
   return csernaDistro;
 }
 
-set<ProbabilityNode>::iterator DiscreteDistribution::begin()
+std::vector<ProbabilityNode>::iterator DiscreteDistribution::begin()
 {
   return distribution.begin();
 }
 
-set<ProbabilityNode>::iterator DiscreteDistribution::end()
+std::vector<ProbabilityNode>::iterator DiscreteDistribution::end()
 {
   return distribution.end();
 }
 
 
-set<ProbabilityNode>::const_iterator DiscreteDistribution::begin() const
+std::vector<ProbabilityNode>::const_iterator DiscreteDistribution::begin() const
 {
   return distribution.begin();
 }
 
-set<ProbabilityNode>::const_iterator DiscreteDistribution::end() const
+std::vector<ProbabilityNode>::const_iterator DiscreteDistribution::end() const
 {
   return distribution.end();
 }
