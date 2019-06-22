@@ -126,7 +126,7 @@ DiscreteDistribution::DiscreteDistribution(int maxSamples, const real_time::hsta
   // entries per distribution.  maxSamples is typically set to
   // something like 64, 100, or 128
   auto const &values = hstar_data.hstar_values;
-  int scale = hstar_data.value_count / maxSamples;
+  int const scale = hstar_data.value_count / maxSamples;
   if (scale < 2) {
     for (const auto &[hstar_value, count] : values) {
       distribution.emplace_back(hstar_value, count / static_cast<double>(hstar_data.value_count));
@@ -134,14 +134,25 @@ DiscreteDistribution::DiscreteDistribution(int maxSamples, const real_time::hsta
   } else {
     int mass = 0;
     long int hsvalue = 0;
+    double totalp = 0.0;
+    double const invscale = 1.0 / static_cast<double>(scale);
+    double prob;
     for (const auto &[hstar_value, count] : values) {
       hsvalue += hstar_value * count;
       mass += count;
-      if (mass > scale) {
-        distribution.emplace_back(hsvalue / static_cast<double>(mass), mass);
+      if (mass >= scale) {
+        prob = (mass * invscale) / maxSamples;
+        totalp += prob;
+        distribution.emplace_back(hsvalue / static_cast<double>(mass), prob);
         mass = 0;
         hsvalue = 0;
       }
+    }
+
+    // normalize
+    double const invtotalp = 1.0 / totalp;
+    for (auto &node : distribution) {
+      node.probability *= invtotalp;
     }
   }
   // assert(is_sorted());

@@ -13,7 +13,10 @@
 
 namespace real_time {
 
-static constexpr auto MAX_SAMPLES = 64;
+enum Constants
+{
+ MAX_SAMPLES = 64,
+};
 
 template<class count_type = int>
 struct hstar_sample {
