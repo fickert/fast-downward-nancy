@@ -35,6 +35,8 @@ AStarSolveAll::AStarSolveAll(const Options &opts)
       pruning_method(opts.get<shared_ptr<PruningMethod>>("pruning")),
       hstar_file(opts.get<std::string>("hstar_file")),
       successors_file(opts.get<std::string>("successors_file")),
+      best_solution_state(StateID::no_state),
+      best_solution_cost(std::numeric_limits<int>::max()),
       computing_initial_solution(true),
       reserved_time(opts.get<double>("reserved_time")),
       timer(std::numeric_limits<double>::infinity()) {
@@ -134,7 +136,6 @@ SearchStatus AStarSolveAll::step() {
 		if (computing_initial_solution) {
 			assert(solved_states.empty());
 			current_search_space->trace_path(s, initial_plan);
-			assert(static_cast<int>(expanded_states.size()) == statistics.get_expanded());
 			std::cout << "Found initial solution after " << statistics.get_expanded() << " expansions, continuing to solve all expanded states..." << std::endl;
 			vector<shared_ptr<Evaluator>> evals = {f_evaluator, evaluator};
 			Options options;
@@ -146,9 +147,16 @@ SearchStatus AStarSolveAll::step() {
 		return update_hstar_from_state(node, 0);
 	}
 
-	const auto solved_states_it = solved_states.find(s.get_id());
-	if (solved_states_it != std::end(solved_states))
-		return update_hstar_from_state(node, solved_states_it->second.second);
+	if (!computing_initial_solution) {
+		const auto solved_states_it = solved_states.find(s.get_id());
+		if (solved_states_it != std::end(solved_states)) {
+			const auto solution_cost = node.get_g() + solved_states_it->second.second;
+			if (best_solution_state == StateID::no_state || solution_cost < best_solution_cost) {
+				best_solution_cost = solution_cost;
+				best_solution_state = s.get_id();
+			}
+		}
+	}
 
     vector<OperatorID> applicable_ops;
     successor_generator.generate_applicable_ops(s, applicable_ops);
@@ -167,6 +175,11 @@ SearchStatus AStarSolveAll::step() {
                                     preferred_operator_evaluator.get(),
                                     preferred_operators);
     }
+
+	if (!computing_initial_solution && best_solution_state != StateID::no_state && f_evaluator->compute_result(eval_context).get_evaluator_value() == best_solution_cost) {
+		const auto solution_node = current_search_space->get_node(state_registry.lookup_state(best_solution_state));
+		return update_hstar_from_state(solution_node, best_solution_cost - solution_node.get_g());
+	}
 
     for (OperatorID op_id : applicable_ops) {
         OperatorProxy op = task_proxy.get_operators()[op_id];
@@ -348,6 +361,8 @@ auto AStarSolveAll::update_hstar_from_state(const SearchNode &node, int hstar) -
 	auto eval_context = EvaluationContext(next_initial_state, 0, true, &statistics);
 	assert(!eval_context.is_evaluator_value_infinite(evaluator.get()));
 	open_list->insert(eval_context, next_initial_state_id);
+	best_solution_cost = std::numeric_limits<int>::max();
+	best_solution_state = StateID::no_state;
 	return IN_PROGRESS;
 }
 
