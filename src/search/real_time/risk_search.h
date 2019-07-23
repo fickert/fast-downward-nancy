@@ -89,15 +89,14 @@ class RiskLookaheadSearch : public LookaheadSearch
   PerStateInformation<ShiftedDistribution> post_beliefs;
   std::vector<DiscreteDistribution*> raw_beliefs;
   std::vector<DiscreteDistribution*> raw_post_beliefs;
-
-  // TODO: While backing up the beliefs for each state, we should also
-  // back up the post search belief estimate at the same time I think,
-  // and store it here.
+  ShiftedDistribution dead_end_belief;
 
   hstar_data_type<int> *hstar_data;
   hstar_data_type<long long> *post_expansion_belief_data;
   int hstar_gaussian_fallback_count;
   int post_expansion_belief_gaussian_fallback_count;
+  int alpha_expansion_count;
+  int beta_expansion_count;
 
   // stores the index of the tla that owns the state
   // this is a hack to detect and prevent a state being expanded
@@ -114,8 +113,8 @@ protected:
   double risk_analysis(std::size_t const alpha, const vector<ShiftedDistribution> &beliefs) const;
   std::size_t select_tla();
   void backup_beliefs();
-  ShiftedDistribution node_belief(SearchNode const &);
-  ShiftedDistribution post_expansion_belief(StateID best_state_id);
+  ShiftedDistribution get_belief(EvaluationContext &);
+  ShiftedDistribution get_post_belief(StateID best_state_id);
 public:
 
   RiskLookaheadSearch(StateRegistry &state_registry,

@@ -43,11 +43,11 @@ void add_state_owner(std::unordered_map<StateID, std::vector<int> > &state_owner
   }
 }
 
-ShiftedDistribution RiskLookaheadSearch::node_belief(SearchNode const &node)
+ShiftedDistribution RiskLookaheadSearch::get_belief(EvaluationContext &eval_context)
 {
   // first check if we know this state from previous expansions and
   // have a belief about it
-  auto const &state = node.get_state();
+  auto const &state = eval_context.get_state();
   ShiftedDistribution belief = beliefs[state];
   if (nullptr != belief.distribution) {
     return belief;
@@ -55,7 +55,6 @@ ShiftedDistribution RiskLookaheadSearch::node_belief(SearchNode const &node)
 
   // if not, check if we know which distribution is associated with
   // the states h-value.  If yes, assign the state's belief to that.
-  auto eval_context = EvaluationContext(node.get_state(), node.get_g(), false, nullptr, false);
   int h = eval_context.get_evaluator_value(base_heuristic.get());
   if (static_cast<size_t>(h) >= raw_beliefs.size()) {
     raw_beliefs.resize(h+1);
@@ -130,7 +129,7 @@ ShiftedDistribution RiskLookaheadSearch::node_belief(SearchNode const &node)
 
 // Post expansion belief is generated when a node is created.  It is
 // therefore guaranteed to be cached already.
-ShiftedDistribution RiskLookaheadSearch::post_expansion_belief(StateID state_id)
+ShiftedDistribution RiskLookaheadSearch::get_post_belief(StateID state_id)
 {
   auto const &state = state_registry.lookup_state(state_id);
   ShiftedDistribution post_belief = post_beliefs[state];
@@ -212,8 +211,8 @@ void RiskLookaheadSearch::initialize(const GlobalState &initial_state)
     tlas.ops.push_back(op_id);
 
     // add the belief
-    tlas.beliefs.push_back(node_belief(succ_node));
-    tlas.post_beliefs.push_back(post_expansion_belief(succ_state.get_id()));
+    tlas.beliefs.push_back(get_belief(eval_context));
+    tlas.post_beliefs.push_back(get_post_belief(succ_state.get_id()));
 
     // add the node to this tla's open list
     tlas.open_lists.emplace_back();
@@ -241,6 +240,11 @@ void RiskLookaheadSearch::initialize(const GlobalState &initial_state)
 
   mark_expanded(root_node);
   statistics->inc_generated(tlas.size());
+
+  auto *dead_distribution = new DiscreteDistribution(1);
+  // hack to make a distribution with one value at infinity
+  dead_distribution->createFromUniform(1, std::numeric_limits<double>::infinity(), 0);
+  dead_end_belief.set(dead_distribution, 0);
 
   if (heuristic_error)
     heuristic_error->update_error();
@@ -295,7 +299,7 @@ size_t RiskLookaheadSearch::select_tla()
     }
     assert(expansion_delay);
     // Simulate how expanding this TLA's best node would affect its belief
-    assert(tlas.post_beliefs[i].expected_cost() == post_expansion_belief(tlas.open_lists[i].top().second).expected_cost());
+    assert(tlas.post_beliefs[i].expected_cost() == get_post_belief(tlas.open_lists[i].top().second).expected_cost());
     ShiftedDistribution post_i = tlas.post_beliefs[i];
     assert(post_i.distribution);
     // swap in the estimated post expansion belief
@@ -339,6 +343,14 @@ size_t RiskLookaheadSearch::select_tla()
     }
   }
 
+  // TODO: optionally keeping counters for each expansion phase would
+  // also be useful.
+
+  if (alpha_cost == tlas.beliefs[res].expected_cost())
+    ++alpha_expansion_count;
+  else
+    ++beta_expansion_count;
+
   return res;
 }
 
@@ -352,9 +364,7 @@ void RiskLookaheadSearch::backup_beliefs()
     // list that is owned by the tla
     while (1) {
       if (tlas.open_lists[tla_id].empty()) {
-        // TODO: it doesn't matter, but it's a little weird, we only
-        // change the expected value here, but not the distribution.
-        tlas.beliefs[tla_id].expected_value = numeric_limits<double>::infinity();
+        tlas.beliefs[tla_id] = dead_end_belief;
         break;
       }
 
@@ -363,11 +373,11 @@ void RiskLookaheadSearch::backup_beliefs()
       if (state_owned_by_tla(state_owners, state_id, tla_id)) {
         auto best_state = state_registry.lookup_state(state_id);
         auto best_node = search_space->get_node(best_state);
-        // compute belief, or lookup if new
-        tlas.beliefs[tla_id] = node_belief(best_node);
-        tlas.post_beliefs[tla_id] = post_expansion_belief(state_id);
-        assert(tlas.beliefs[tla_id].distribution != nullptr);
-        assert(tlas.post_beliefs[tla_id].distribution != nullptr);
+        // every known node should have a known belief
+        assert(beliefs[best_state].distribution != nullptr);
+        assert(post_beliefs[best_state].distribution != nullptr);
+        tlas.beliefs[tla_id] = beliefs[best_state];
+        tlas.post_beliefs[tla_id] = post_beliefs[best_state];
         break;
       } else {
         tlas.remove_min(tla_id);
@@ -437,21 +447,23 @@ SearchStatus RiskLookaheadSearch::search()
       if (succ_node.is_dead_end())
         continue;
 
+      auto succ_eval_context = EvaluationContext(succ_state, node.get_g() + op.get_cost(), false, statistics.get());
+
       if (succ_node.is_new()) {
         statistics->inc_evaluated_states();
         bool is_dead_end =
-          eval_context.is_evaluator_value_infinite(f_hat_evaluator.get()) &&
-          eval_context.is_evaluator_value_infinite(heuristic.get());
+          succ_eval_context.is_evaluator_value_infinite(f_hat_evaluator.get()) &&
+          succ_eval_context.is_evaluator_value_infinite(heuristic.get());
         if (is_dead_end) {
           succ_node.mark_as_dead_end();
           statistics->inc_dead_ends();
           continue;
         }
         succ_node.open(node, op, op.get_cost());
-        auto belief = node_belief(succ_node);
+        auto belief = get_belief(succ_eval_context);
         tlas.open_lists[tla_id].emplace(NodeEvaluation(static_cast<double>(node.get_g())
                                                        + belief.expected_cost(),
-                                                       eval_context.get_result(heuristic.get()).get_evaluator_value()),
+                                                       succ_eval_context.get_result(heuristic.get()).get_evaluator_value()),
                                         succ_state.get_id());
         make_state_owner(state_owners, succ_state.get_id(), tla_id);
       } else {
@@ -461,10 +473,10 @@ SearchStatus RiskLookaheadSearch::search()
           if (succ_node.is_closed())
             statistics->inc_reopened();
           succ_node.reopen(node, op, op.get_cost());
-          auto belief = node_belief(succ_node);
+          auto belief = get_belief(succ_eval_context);
           tlas.open_lists[tla_id].emplace(NodeEvaluation(static_cast<double>(node.get_g())
                                                        + belief.expected_cost(),
-                                                         eval_context.get_result(heuristic.get()).get_evaluator_value()),
+                                                         succ_eval_context.get_result(heuristic.get()).get_evaluator_value()),
                                           succ_state.get_id());
 
           if (old_g != new_g) {
@@ -494,15 +506,13 @@ SearchStatus RiskLookaheadSearch::search()
     }
   }
   return IN_PROGRESS;
-
-  // TODO: In Tianyi/Andrew's code there's also something here to
-  // learn the one-step error. I'm not sure yet what that's about
-  // exactly and how to translate it.
 }
 
 void RiskLookaheadSearch::print_statistics() const {
-  std::cout << "Fallback to gaussian (node belief): " << hstar_gaussian_fallback_count << std::endl;
-  std::cout << "Fallback to gaussian (post-expansion belief): " << post_expansion_belief_gaussian_fallback_count << std::endl;
+  std::cout << "Fallback to gaussian (node belief): " << hstar_gaussian_fallback_count << "\n"
+            << "Fallback to gaussian (post-expansion belief): " << post_expansion_belief_gaussian_fallback_count << "\n"
+            << "Number of expansions under alpha: " << alpha_expansion_count << "\n"
+            << "Number of expansions under beta: " << beta_expansion_count << "\n";
 }
 
 RiskLookaheadSearch::RiskLookaheadSearch(StateRegistry &state_registry, int lookahead_bound,
@@ -519,7 +529,9 @@ RiskLookaheadSearch::RiskLookaheadSearch(StateRegistry &state_registry, int look
     hstar_data(hstar_data),
     post_expansion_belief_data(post_expansion_belief_data),
     hstar_gaussian_fallback_count(0),
-    post_expansion_belief_gaussian_fallback_count(0)
+    post_expansion_belief_gaussian_fallback_count(0),
+    alpha_expansion_count(0),
+    beta_expansion_count(0)
 {
   tlas.reserve(32);
   applicables.reserve(32);
