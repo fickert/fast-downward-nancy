@@ -73,6 +73,7 @@ public:
   template<class count_type>
   DiscreteDistribution(int maxSamples, const real_time::hstar_data_entry<count_type> &hstar_data);
   DiscreteDistribution(double g, double h, bool& retSuccess);
+  DiscreteDistribution(DiscreteDistribution const &other);
   DiscreteDistribution(DiscreteDistribution const *other);
 
   void createFromUniform(int maxSamples, double g, double d);

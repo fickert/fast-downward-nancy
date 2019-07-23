@@ -280,12 +280,17 @@ DiscreteDistribution::DiscreteDistribution(int maxSamples, double deltaSpikeValu
   distribution.push_back(ProbabilityNode(deltaSpikeValue, 1.0));
 }
 
-DiscreteDistribution::DiscreteDistribution(DiscreteDistribution const *other)
-  :maxSamples(other->maxSamples)
+DiscreteDistribution::DiscreteDistribution(DiscreteDistribution const &other)
+  :maxSamples(other.maxSamples)
 {
-  for (ProbabilityNode n : other->distribution) {
+  for (ProbabilityNode n : other.distribution) {
     distribution.push_back(n);
   }
+}
+
+DiscreteDistribution::DiscreteDistribution(DiscreteDistribution const *other)
+  :DiscreteDistribution(*other)
+{
 }
 
 DiscreteDistribution::DiscreteDistribution(double g, double h, bool& retSuccess)
