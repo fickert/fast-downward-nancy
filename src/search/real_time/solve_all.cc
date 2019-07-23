@@ -22,7 +22,7 @@ SolveAll::SolveAll(Options const &opts)
     reopen_closed_nodes(opts.get<bool>("reopen_closed")),
     evaluator(opts.get<std::shared_ptr<Evaluator>>("eval")),
     initial_id(state_registry.get_initial_state().get_id()),
-    planning(true),
+    timeout(false),
     reserved_time(opts.get<double>("reserved_time")),
     timer(std::numeric_limits<double>::infinity()),
     hstar_file(opts.get<std::string>("hstar_file")),
@@ -78,6 +78,10 @@ void SolveAll::initialize()
   int g_level = 0;
 
   while (!open_list->empty()) {
+    if (timer.is_expired()) {
+      timeout = true;
+      return;
+    }
     StateID cur_id = open_list->remove_min();
     GlobalState s = state_registry.lookup_state(cur_id);
     SearchNode node = search_space.get_node(s);
@@ -204,6 +208,9 @@ SearchStatus SolveAll::step()
 {
   if (goals.size() == 0) {
     return FAILED;
+  }
+  if (timeout) {
+    return TIMEOUT;
   }
 
   // make the plan

@@ -41,7 +41,7 @@ class SolveAll : public SearchEngine
   // std::unordered_map<StateID, std::pair<int, int>> solved_states;
   std::vector<OperatorID> initial_plan;
   std::queue<std::pair<StateID,int> > d_queue;
-  bool planning;
+  bool timeout;
   const double reserved_time;
 	utils::CountdownTimer timer;
 	const std::string hstar_file;
