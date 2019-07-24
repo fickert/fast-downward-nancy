@@ -298,7 +298,7 @@ void AStarSolveAll::compute_and_dump_successors_data() {
 			auto successor = state_registry.get_successor_state(state, op);
 			auto eval_context = EvaluationContext(successor);
 			if (!eval_context.is_evaluator_value_infinite(evaluator.get()))
-				out << " " << op.get_cost() << " " << eval_context.get_evaluator_value(evaluator.get());
+				out << " " << get_adjusted_cost(op) << " " << eval_context.get_evaluator_value(evaluator.get());
 		}
 	};
 	for (const auto &[state_id, h_values] : solved_states) {
@@ -343,7 +343,7 @@ auto AStarSolveAll::update_hstar_from_state(const SearchNode &node, int hstar) -
 				break;
 
 			current_state = state_registry.lookup_state(current_node.get_parent_state_id());
-			hstar += task_proxy.get_operators()[current_node.get_creating_operator()].get_cost();
+			hstar += get_adjusted_cost(task_proxy.get_operators()[current_node.get_creating_operator()]);
 		}
 	}
 
