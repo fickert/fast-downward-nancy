@@ -43,6 +43,48 @@ void add_state_owner(std::unordered_map<StateID, std::vector<int> > &state_owner
   }
 }
 
+// This function returns the distribution from the data for a given h
+// value.  This requires taking care of multiple things (since we
+// might have to extrapolate).  First, if there is data for h, its
+// distribution is returned.  Otherwise we find the greatest h_adj
+// lower than h for which there is data.  We create a new distribution
+// for h by shifting the distribution of h_adj.  In all cases, all
+// constructed distributions are cached to be available next time we
+// look up the distribution for this h value.
+template<typename T>
+DiscreteDistribution *get_distribution(hstar_data_type<T> const *data, int const h_in, std::vector<DiscreteDistribution*> &raws)
+{
+  DiscreteDistribution *res = nullptr;
+  int h_adj = h_in;
+
+  while (h_adj >= 0) {
+    const auto it = data->find(h_adj);
+    if (it != std::end(*data)) {
+      DiscreteDistribution *raw = raws[h_adj];
+      if (raw == nullptr) {
+        raw = new DiscreteDistribution(MAX_SAMPLES, it->second);
+        raws[h_adj] = raw;
+      }
+      if (h_in == h_adj) {
+        // no extrapolation necessary
+        res = raw;
+      } else {
+        // create a new extrapolated distribution
+        int const shift = h_in - h_adj;
+        assert(shift >= 0);
+        double const d_shift = static_cast<double>(shift);
+        res = new DiscreteDistribution(raw, d_shift);
+        raws[h_in] = res;
+      }
+      break;
+    } else {
+      --h_adj;
+    }
+  }
+
+  return res;
+}
+
 ShiftedDistribution RiskLookaheadSearch::get_belief(EvaluationContext &eval_context)
 {
   // first check if we know this state from previous expansions and
@@ -66,17 +108,15 @@ ShiftedDistribution RiskLookaheadSearch::get_belief(EvaluationContext &eval_cont
   DiscreteDistribution *distribution = raw_beliefs[h];
   if (!distribution) {
     // if not, create the distribution for this h-value based on data,
-    // or using gauss, cache it, and assign the state's belief to it.
+    // possibly extrapolating it, cache it, and assign the state's
+    // belief to it.
     has_data = false;
     if (hstar_data) {
-      const auto hstar_data_it = hstar_data->find(h);
-      if (hstar_data_it != std::end(*hstar_data)) {
-        has_data = true;
-        distribution = new DiscreteDistribution(MAX_SAMPLES, hstar_data_it->second);
-        raw_beliefs[h] = distribution;
-      }
+      distribution = get_distribution(hstar_data, h, raw_beliefs);
+      has_data = nullptr != distribution;
     }
     if (!has_data) {
+      // this should only happen if we're not using the data-driven approach
       ++hstar_gaussian_fallback_count;
       const auto f = eval_context.get_evaluator_value_or_infinity(f_evaluator.get());
       assert(f != EvaluationResult::INFTY);
@@ -99,14 +139,11 @@ ShiftedDistribution RiskLookaheadSearch::get_belief(EvaluationContext &eval_cont
   if (!post_distribution) {
     has_data = false;
     if (post_expansion_belief_data) {
-      const auto post_data_it = post_expansion_belief_data->find(h);
-      if (post_data_it != std::end(*post_expansion_belief_data)) {
-        has_data = true;
-        post_distribution = new DiscreteDistribution(MAX_SAMPLES, post_data_it->second);
-        raw_post_beliefs[h] = post_distribution;
-      }
+      post_distribution = get_distribution(post_expansion_belief_data, h, raw_post_beliefs);
+      has_data = nullptr != distribution;
     }
     if (!has_data) {
+      // this should only happen if we're not using the data-driven approach
       ++post_expansion_belief_gaussian_fallback_count;
       double ds = 1 / expansion_delay->get_avg_expansion_delay();
       auto eval_context = EvaluationContext(state_registry.lookup_state(state.get_id()), -1, false, nullptr);
@@ -536,6 +573,11 @@ RiskLookaheadSearch::RiskLookaheadSearch(StateRegistry &state_registry, int look
   tlas.reserve(32);
   applicables.reserve(32);
   state_owners.reserve(lookahead_bound);
+  assert(raw_beliefs.size() == 0 && raw_post_beliefs.size() == 0);
+
+  // this way we always have data for the goal state.
+  raw_beliefs.push_back(new DiscreteDistribution(1, 0.0));
+  raw_post_beliefs.push_back(new DiscreteDistribution(1, 0.0));
 }
 
 RiskLookaheadSearch::~RiskLookaheadSearch()
