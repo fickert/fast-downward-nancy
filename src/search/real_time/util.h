@@ -41,15 +41,17 @@ auto read_hstar_data(const std::string &file_name) -> hstar_data_type<count_type
 	int h, hs;
 	count_type valueCount, hsCount;
 
-  // TODO: this is actually worth optimizing since we have lots of
-  // data. in my medium sized transport test instance, perf reports
-  // that 15% of the time is spent parsing (in calls to
-  // std::istream::operator>>, std::num_get<char>, and other istream
-  // functions).  a custom parser would probably be more efficient.
+	// TODO: this could be made a little more efficient with a custom parser.
 	while (std::getline(f, line)) {
 		std::stringstream ss(line);
 		ss >> h;
 		ss >> valueCount;
+
+		if (0 == valueCount) {
+			// this can happen.  the post expansion belief script sometimes
+			// generates empty distributions
+			continue;
+		}
 
 		if (parsed_hstar_data.find(h) != std::end(parsed_hstar_data)) {
 			std::cerr << "error: duplicate h from data " << h << std::endl;
