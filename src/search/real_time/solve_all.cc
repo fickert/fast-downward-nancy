@@ -217,24 +217,46 @@ SearchStatus SolveAll::step()
   {
     std::cout << "reconstructing an optimal plan\n";
     StateID cur_id = initial_id;
+    std::vector<OperatorID> apps;
     while (1) {
-      auto it = hstars.find(cur_id);
+      GlobalState s = state_registry.lookup_state(cur_id);
+      auto const it = hstars.find(s.get_id());
       if (it == hstars.end()) {
         std::cerr  << "unknown hstar value when tracing plan\n";
         return FAILED;
       }
-      if (it->second == 0) {
-        break;
+      int const cur_hstar = it->second;
+      if (cur_hstar == 0) {
+        set_plan(initial_plan);
+        break; // goal found
       }
-      auto succ = best_succ.find(cur_id);
-      if (succ == best_succ.end()) {
-        std::cerr << "unknown successor for state when tracing plan\n";
+
+      apps.clear();
+      successor_generator.generate_applicable_ops(s, apps);
+      bool optimal_succ_found = false;
+
+      for (OperatorID op_id : apps) {
+        OperatorProxy op = task_proxy.get_operators()[op_id];
+        GlobalState succ = state_registry.get_successor_state(s, op);
+        StateID const succ_id = succ.get_id();
+        auto const succ_it = hstars.find(succ_id);
+        if (succ_it == hstars.end()) {
+          std::cerr  << "unknown hstar value when tracing plan\n";
+          return FAILED;
+        }
+        if (succ_it->second + get_adjusted_cost(op) == cur_hstar) {
+          optimal_succ_found = true;
+          initial_plan.push_back(OperatorID(op_id));
+          cur_id = succ_id;
+          break;
+        }
+      }
+
+      if (!optimal_succ_found) {
+        std::cerr << "Couldn't find optimal successor state for " << cur_id << "\n";
         return FAILED;
       }
-      initial_plan.push_back(OperatorID(succ->second.second.get_id()));
-      cur_id = succ->second.first;
     }
-    set_plan(initial_plan);
   }
 
   // dump hstar values
