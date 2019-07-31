@@ -45,9 +45,6 @@ struct CompareDistance
   }
 };
 
-// TODO: the expected cost could be computed and stored during
-// construction.  We always need it anyway when dealing with
-// distributions.  (ShiftedDistribution already does it that way).
 class DiscreteDistribution
 {
   std::vector<ProbabilityNode> distribution;
@@ -74,7 +71,9 @@ public:
   DiscreteDistribution(int maxSamples, const real_time::hstar_data_entry<count_type> &hstar_data);
   DiscreteDistribution(double g, double h, bool& retSuccess);
   DiscreteDistribution(DiscreteDistribution const &other);
+  DiscreteDistribution(DiscreteDistribution const &other, double shift);
   DiscreteDistribution(DiscreteDistribution const *other);
+  DiscreteDistribution(DiscreteDistribution const *other, double shift);
 
   void createFromUniform(int maxSamples, double g, double d);
   void createFromGaussian(double f, double mean, double d, double error);
@@ -144,6 +143,7 @@ DiscreteDistribution::DiscreteDistribution(int maxSamples, const real_time::hsta
       if (mass >= scale) {
         prob = (mass * invscale) / maxSamples;
         totalp += prob;
+        assert(hsvalue / static_cast<double>(mass) >= 0.0);
         distribution.emplace_back(hsvalue / static_cast<double>(mass), prob);
         mass = 0;
         hsvalue = 0;

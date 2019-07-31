@@ -145,6 +145,10 @@ DiscreteDistribution::DiscreteDistribution(int maxSamples, double f, double mean
     return;
   }
 
+  if (error < 0.0) {
+    error = 0.0;
+  }
+
   double stdDev = error / 2.0;
   auto var = std::pow(stdDev, 2);
 
@@ -283,13 +287,26 @@ DiscreteDistribution::DiscreteDistribution(int maxSamples, double deltaSpikeValu
 DiscreteDistribution::DiscreteDistribution(DiscreteDistribution const &other)
   :maxSamples(other.maxSamples)
 {
-  for (ProbabilityNode n : other.distribution) {
-    distribution.push_back(n);
+  for (ProbabilityNode const &n : other.distribution) {
+    distribution.emplace_back(n.cost, n.probability);
+  }
+}
+
+DiscreteDistribution::DiscreteDistribution(DiscreteDistribution const &other, double shift)
+  :maxSamples(other.maxSamples)
+{
+  for (ProbabilityNode const &n : other.distribution) {
+    distribution.emplace_back(n.cost + shift, n.probability);
   }
 }
 
 DiscreteDistribution::DiscreteDistribution(DiscreteDistribution const *other)
   :DiscreteDistribution(*other)
+{
+}
+
+DiscreteDistribution::DiscreteDistribution(DiscreteDistribution const *other, double shift)
+  : DiscreteDistribution(*other, shift)
 {
 }
 
