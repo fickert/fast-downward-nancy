@@ -275,9 +275,6 @@ void RiskLookaheadSearch::initialize(const GlobalState &initial_state)
     // here, that the state of all top level nodes are distinct)
     make_state_owner(state_owners, succ_state.get_id(), static_cast<int>(tlas.ops.size()) - 1);
 
-    // add the state of the tla
-    tlas.states.push_back(succ_state.get_id());
-
     if (heuristic_error)
       heuristic_error->add_successor(succ_node, op.get_cost());
   }
@@ -413,15 +410,23 @@ void RiskLookaheadSearch::backup_beliefs()
       }
 
       // get the best state from open
-      auto state_id = tlas.min(tla_id);
+      auto const state_id = tlas.min(tla_id);
+      // only consider this state if we own it
       if (state_owned_by_tla(state_owners, state_id, tla_id)) {
-        auto best_state = state_registry.lookup_state(state_id);
-        auto best_node = search_space->get_node(best_state);
-        // every known node should have a known belief
-        assert(beliefs[best_state].distribution != nullptr);
-        assert(post_beliefs[best_state].distribution != nullptr);
-        tlas.beliefs[tla_id] = beliefs[best_state];
-        tlas.post_beliefs[tla_id] = post_beliefs[best_state];
+        // only do backup if it's a different state from last time
+        if (state_id != tlas.states[tla_id]) {
+          tlas.states[tla_id] = state_id;
+          auto best_state = state_registry.lookup_state(state_id);
+          auto best_node = search_space->get_node(best_state);
+          // every known node should have a known belief
+          assert(beliefs[best_state].distribution != nullptr);
+          assert(post_beliefs[best_state].distribution != nullptr);
+          tlas.beliefs[tla_id] = beliefs[best_state];
+          tlas.post_beliefs[tla_id] = post_beliefs[best_state];
+          tlas.eval_contexts[tla_id] = EvaluationContext(best_state, best_node.get_g(), false, statistics.get());
+        }
+        // we're done in any case, since we found the best owned node
+        // for this tla.
         break;
       } else {
         tlas.remove_min(tla_id);

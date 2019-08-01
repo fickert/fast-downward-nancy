@@ -49,17 +49,8 @@ struct TLAs
   // backed up belief for each tla
   std::vector<ShiftedDistribution> beliefs;
   std::vector<ShiftedDistribution> post_beliefs;
+  // "states" stores the current best state of each tla.
   std::vector<StateID> states;
-  /*
-  // "states" stores the top most states of each tla.
-  // if a1,a2,a3 are the tlas, then "states" stores the state ids of the nodes n1,n2,n3:
-  current_node
-     /  |   \
-   a1   a2   a3 ...
-   /    |     \
-  n1    n2     n3 ...
-  */
-
   // TODO: not sure if this is smart, setting up all these eval
   // contexts
   std::vector<EvaluationContext> eval_contexts;
