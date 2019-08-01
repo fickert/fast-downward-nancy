@@ -47,39 +47,46 @@ void add_state_owner(std::unordered_map<StateID, std::vector<int> > &state_owner
 // value.  This requires taking care of multiple things (since we
 // might have to extrapolate).  First, if there is data for h, its
 // distribution is returned.  Otherwise we find the greatest h_adj
-// lower than h for which there is data.  We create a new distribution
-// for h by shifting the distribution of h_adj.  In all cases, all
-// constructed distributions are cached to be available next time we
-// look up the distribution for this h value.
+// lower than h for which have a distribution.  We create a new
+// distribution for h by shifting the distribution of h_adj.  In all
+// cases, all constructed distributions are cached to be available
+// next time we look up the distribution for this h value.
 template<typename T>
 DiscreteDistribution *get_distribution(hstar_data_type<T> const *data, int const h_in, std::vector<DiscreteDistribution*> &raws)
 {
   DiscreteDistribution *res = nullptr;
+  DiscreteDistribution *raw;
   int h_adj = h_in;
 
   while (h_adj >= 0) {
+    // check if we have previously computed the distribution for h_adj
+    raw = raws[h_adj];
+    if (raw != nullptr) {
+      break;
+    }
+
+    // else check if we have data to compute the distribution for h_adj
     const auto it = data->find(h_adj);
     if (it != std::end(*data)) {
-      DiscreteDistribution *raw = raws[h_adj];
-      if (raw == nullptr) {
-        raw = new DiscreteDistribution(MAX_SAMPLES, it->second);
-        raws[h_adj] = raw;
-      }
-      if (h_in == h_adj) {
-        // no extrapolation necessary
-        res = raw;
-      } else {
-        // create a new extrapolated distribution
-        int const shift = h_in - h_adj;
-        assert(shift >= 0);
-        double const d_shift = static_cast<double>(shift);
-        res = new DiscreteDistribution(raw, d_shift);
-        raws[h_in] = res;
-      }
+      raw = new DiscreteDistribution(MAX_SAMPLES, it->second);
+      raws[h_adj] = raw;
       break;
-    } else {
-      --h_adj;
     }
+
+    // else check the next smaller h
+    --h_adj;
+  }
+
+  if (h_in == h_adj) {
+    // no extrapolation necessary
+    res = raw;
+  } else {
+    // create a new extrapolated distribution
+    int const shift = h_in - h_adj;
+    assert(shift >= 0);
+    double const d_shift = static_cast<double>(shift);
+    res = new DiscreteDistribution(raw, d_shift);
+    raws[h_in] = res;
   }
 
   return res;
