@@ -113,26 +113,26 @@ auto EagerLookaheadSearch::search() -> SearchStatus {
 				continue;
 
 			if (succ_node.is_new()) {
-				auto succ_eval_context = EvaluationContext(succ_state, node.get_g() + op.get_cost(), false, statistics.get());
+				auto succ_eval_context = EvaluationContext(succ_state, node.get_g() + get_adjusted_cost(op), false, statistics.get());
 				statistics->inc_evaluated_states();
 				if (open_list->is_dead_end(succ_eval_context)) {
 					succ_node.mark_as_dead_end();
 					statistics->inc_dead_ends();
 					continue;
 				}
-				succ_node.open(node, op, op.get_cost());
+				succ_node.open(node, op, get_adjusted_cost(op)));
 				open_list->insert(succ_eval_context, succ_state.get_id());
-			} else if (succ_node.get_g() > node.get_g() + op.get_cost()) {
+			} else if (succ_node.get_g() > node.get_g() get_adjusted_cost(op)) {
 				// We found a new cheapest path to an open or closed state.
 				if (succ_node.is_closed())
 					statistics->inc_reopened();
-				succ_node.reopen(node, op, op.get_cost());
+				succ_node.reopen(node, op, get_adjusted_cost(op));
 				auto succ_eval_context = EvaluationContext(succ_state, succ_node.get_g(), false, statistics.get());
 				open_list->insert(succ_eval_context, succ_state.get_id());
 			}
 			open_list_insertion_time[id] = statistics->get_expanded();
 			if (heuristic_error)
-				heuristic_error->add_successor(succ_node, op.get_cost());
+				heuristic_error->add_successor(succ_node, get_adjusted_cost(op));
 		}
 		if (heuristic_error)
 			heuristic_error->update_error();

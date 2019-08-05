@@ -70,7 +70,7 @@ void DijkstraLearning::apply_updates(const std::unordered_map<StateID, std::vect
 			if (closed_it != std::end(closed)) {
 				assert(learning_evaluator->is_estimate_cached(predecessor));
 				const auto predecessor_h = learning_evaluator->get_cached_estimate(predecessor);
-				const auto new_h = h + op.get_cost();
+				const auto new_h = h + get_adjusted_cost(op);
 				if (predecessor_h > new_h) {
 					closed.erase(closed_it);
 					// NOTE: the base evaluator should not need to be checked for consistent heuristics

@@ -163,7 +163,7 @@ SearchStatus RealTimeSearch::step() {
 		search_space.trace_path(current_state, overall_plan);
 		auto plan = lookahead_search->get_plan();
 		for (auto op_id : plan)
-			solution_cost += task_proxy.get_operators()[op_id].get_cost();
+			solution_cost += get_adjusted_cost(task_proxy.get_operators()[op_id]);
 		overall_plan.insert(std::end(overall_plan), std::begin(plan), std::end(plan));
 		set_plan(overall_plan);
 		return SOLVED;
@@ -192,11 +192,11 @@ SearchStatus RealTimeSearch::step() {
 	const auto best_top_level_action = decision_strategy->get_top_level_action(lookahead_search->get_frontier(), lookahead_search->get_search_space());
 	const auto parent_node = search_space.get_node(current_state);
 	const auto op = task_proxy.get_operators()[best_top_level_action];
-	solution_cost += op.get_cost();
+	solution_cost += get_adjusted_cost(op);
 	current_state = state_registry.get_successor_state(current_state, op);
 	auto next_node = search_space.get_node(current_state);
 	if (next_node.is_new())
-    next_node.open(parent_node, op, op.get_cost());
+		next_node.open(parent_node, op, get_adjusted_cost(op));
 	return IN_PROGRESS;
 }
 

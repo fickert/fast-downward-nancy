@@ -238,10 +238,11 @@ void RiskLookaheadSearch::initialize(const GlobalState &initial_state)
     auto const op = task_proxy.get_operators()[op_id];
     auto const succ_state = state_registry.get_successor_state(initial_state, op);
     auto succ_node = search_space->get_node(succ_state);
+    auto const adj_cost = get_adjusted_cost(op);
     if (succ_node.is_new())
-      succ_node.open(root_node, op, op.get_cost());
-    else if (!succ_node.is_dead_end() && op.get_cost() < succ_node.get_g())
-      succ_node.reopen(root_node, op, op.get_cost());
+      succ_node.open(root_node, op, adj_cost);
+    else if (!succ_node.is_dead_end() && adj_cost < succ_node.get_g())
+      succ_node.reopen(root_node, op, adj_cost);
     else
       continue;
 
@@ -276,7 +277,7 @@ void RiskLookaheadSearch::initialize(const GlobalState &initial_state)
     make_state_owner(state_owners, succ_state.get_id(), static_cast<int>(tlas.ops.size()) - 1);
 
     if (heuristic_error)
-      heuristic_error->add_successor(succ_node, op.get_cost());
+      heuristic_error->add_successor(succ_node, adj_cost);
   }
 
   mark_expanded(root_node);
@@ -486,6 +487,7 @@ SearchStatus RiskLookaheadSearch::search()
 
     for (auto op_id : applicables) {
       const auto op = task_proxy.get_operators()[op_id];
+      const auto adj_cost = get_adjusted_cost(op);
       const auto succ_state = state_registry.get_successor_state(state, op);
       statistics->inc_generated();
       auto succ_node = search_space->get_node(succ_state);
@@ -496,7 +498,7 @@ SearchStatus RiskLookaheadSearch::search()
       if (succ_node.is_dead_end())
         continue;
 
-      auto succ_eval_context = EvaluationContext(succ_state, node.get_g() + op.get_cost(), false, statistics.get());
+      auto succ_eval_context = EvaluationContext(succ_state, node.get_g() + adj_cost, false, statistics.get());
 
       if (succ_node.is_new()) {
         statistics->inc_evaluated_states();
@@ -508,7 +510,7 @@ SearchStatus RiskLookaheadSearch::search()
           statistics->inc_dead_ends();
           continue;
         }
-        succ_node.open(node, op, op.get_cost());
+        succ_node.open(node, op, adj_cost);
         auto belief = get_belief(succ_eval_context);
         tlas.open_lists[tla_id].emplace(NodeEvaluation(static_cast<double>(node.get_g())
                                                        + belief.expected_cost(),
@@ -517,11 +519,11 @@ SearchStatus RiskLookaheadSearch::search()
         make_state_owner(state_owners, succ_state.get_id(), tla_id);
       } else {
         auto const old_g = succ_node.get_g();
-        auto const new_g = node.get_g() + op.get_cost();
+        auto const new_g = node.get_g() + adj_cost;
         if (old_g > new_g) {
           if (succ_node.is_closed())
             statistics->inc_reopened();
-          succ_node.reopen(node, op, op.get_cost());
+          succ_node.reopen(node, op, adj_cost);
           auto belief = get_belief(succ_eval_context);
           tlas.open_lists[tla_id].emplace(NodeEvaluation(static_cast<double>(node.get_g())
                                                        + belief.expected_cost(),
@@ -540,7 +542,7 @@ SearchStatus RiskLookaheadSearch::search()
 
       open_list_insertion_time[state_id] = statistics->get_expanded();
       if (heuristic_error)
-        heuristic_error->add_successor(succ_node, op.get_cost());
+        heuristic_error->add_successor(succ_node, adj_cost);
     }
     if (heuristic_error)
       heuristic_error->update_error();
