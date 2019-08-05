@@ -54,7 +54,6 @@ protected:
 
     void set_plan(const Plan &plan);
     bool check_goal_and_set_plan(const GlobalState &state);
-    int get_adjusted_cost(const OperatorProxy &op) const;
 public:
     SearchEngine(const options::Options &opts);
     virtual ~SearchEngine();
@@ -67,6 +66,7 @@ public:
     const SearchStatistics &get_statistics() const {return statistics;}
     void set_bound(int b) {bound = b;}
     int get_bound() {return bound;}
+    int get_adjusted_cost(const OperatorProxy &op) const;
     PlanManager &get_plan_manager() {return plan_manager;}
 
     /* The following three methods should become functions as they

@@ -238,7 +238,7 @@ void RiskLookaheadSearch::initialize(const GlobalState &initial_state)
     auto const op = task_proxy.get_operators()[op_id];
     auto const succ_state = state_registry.get_successor_state(initial_state, op);
     auto succ_node = search_space->get_node(succ_state);
-    auto const adj_cost = get_adjusted_cost(op);
+    auto const adj_cost = search_engine->get_adjusted_cost(op);
     if (succ_node.is_new())
       succ_node.open(root_node, op, adj_cost);
     else if (!succ_node.is_dead_end() && adj_cost < succ_node.get_g())
@@ -487,7 +487,7 @@ SearchStatus RiskLookaheadSearch::search()
 
     for (auto op_id : applicables) {
       const auto op = task_proxy.get_operators()[op_id];
-      const auto adj_cost = get_adjusted_cost(op);
+      const auto adj_cost = search_engine->get_adjusted_cost(op);
       const auto succ_state = state_registry.get_successor_state(state, op);
       statistics->inc_generated();
       auto succ_node = search_space->get_node(succ_state);
@@ -568,9 +568,9 @@ void RiskLookaheadSearch::print_statistics() const {
 
 RiskLookaheadSearch::RiskLookaheadSearch(StateRegistry &state_registry, int lookahead_bound,
                                          std::shared_ptr<Evaluator> heuristic, std::shared_ptr<Evaluator> base_heuristic, std::shared_ptr<Evaluator> distance,
-                                         bool store_exploration_data, ExpansionDelay *expansion_delay, HeuristicError *heuristic_error, hstar_data_type<int> *hstar_data, hstar_data_type<long long> *post_expansion_belief_data)
+                                         bool store_exploration_data, ExpansionDelay *expansion_delay, HeuristicError *heuristic_error, hstar_data_type<int> *hstar_data, hstar_data_type<long long> *post_expansion_belief_data, SearchEngine const *search_engine)
   : LookaheadSearch(state_registry, lookahead_bound, store_exploration_data,
-                    expansion_delay, heuristic_error),
+                    expansion_delay, heuristic_error, search_engine),
     f_evaluator(std::make_shared<sum_evaluator::SumEvaluator>(std::vector<std::shared_ptr<Evaluator>>{heuristic, std::make_shared<g_evaluator::GEvaluator>()})),
     f_hat_evaluator(create_f_hat_evaluator(heuristic, distance, *heuristic_error)),
     heuristic(heuristic),

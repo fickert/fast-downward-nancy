@@ -7,8 +7,8 @@
 namespace real_time
 {
 
-NancyLearning::NancyLearning(StateRegistry const &state_registry)
-	: state_registry(state_registry)
+NancyLearning::NancyLearning(StateRegistry const &state_registry, SearchEngine const *search_engine)
+	: state_registry(state_registry), search_engine(search_engine)
 {
 }
 
@@ -78,7 +78,7 @@ void NancyLearning::apply_updates(const std::unordered_map<StateID,
       }
       auto const &predecessor = state_registry.lookup_state(p_id);
       auto const p_exp = (*beliefs)[predecessor].expected_cost();
-      auto const new_exp = dstr.expected_cost() + get_adjusted_cost(op);
+      auto const new_exp = dstr.expected_cost() + search_engine->get_adjusted_cost(op);
       if (p_exp > new_exp) {
         // to be clear here:
         // - the new belief that's stored for the predecessor is
@@ -91,14 +91,14 @@ void NancyLearning::apply_updates(const std::unordered_map<StateID,
 
         // backup the main belief
         ShiftedDistribution &p_belief = (*beliefs)[predecessor];
-        p_belief.set_and_shift(dstr, get_adjusted_cost(op));
+        p_belief.set_and_shift(dstr, search_engine->get_adjusted_cost(op));
 
         // backup the post expansion belief
         ShiftedDistribution &p_post_belief = (*post_beliefs)[predecessor];
         ShiftedDistribution &s_post_belief = (*post_beliefs)[state];
         assert(dstr.shift == s_post_belief.shift);
         assert(s_post_belief.distribution);
-        p_post_belief.set_and_shift(s_post_belief, get_adjusted_cost(op));
+        p_post_belief.set_and_shift(s_post_belief, search_engine->get_adjusted_cost(op));
 
         assert(std::abs(new_exp - p_belief.expected_cost()) < 0.001);
         learning_queue.emplace(p_belief, p_id);

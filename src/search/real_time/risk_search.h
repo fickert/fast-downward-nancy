@@ -117,7 +117,8 @@ public:
                       ExpansionDelay *expansion_delay,
                       HeuristicError *heuristic_error,
                       hstar_data_type<int> *hstar_data,
-                      hstar_data_type<long long> *post_expansion_belief_data);
+                      hstar_data_type<long long> *post_expansion_belief_data,
+                      SearchEngine const *search_engine);
   ~RiskLookaheadSearch() override;
 
   void initialize(const GlobalState &initial_state) override;

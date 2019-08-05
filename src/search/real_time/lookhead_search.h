@@ -29,6 +29,7 @@ protected:
 	const successor_generator::SuccessorGenerator &successor_generator;
 	std::unique_ptr<SearchStatistics> statistics;
 
+	SearchEngine const *search_engine; // to call get_adjusted_cost
 	std::unique_ptr<SearchSpace> search_space;
 	const int lookahead_bound;
 	std::vector<StateID> frontier;
@@ -50,7 +51,8 @@ public:
 	                int lookahead_bound,
 	                bool store_exploration_data,
 	                ExpansionDelay *expansion_delay,
-	                HeuristicError *heuristic_error);
+	                HeuristicError *heuristic_error,
+	                SearchEngine const *search_engine);
 	virtual ~LookaheadSearch() = default;
 
 	LookaheadSearch(const LookaheadSearch &) = delete;
@@ -87,7 +89,8 @@ public:
 	                     int lookahead_bound,
 	                     bool store_exploration_data,
 	                     ExpansionDelay *expansion_delay,
-	                     HeuristicError *heuristic_error);
+	                     HeuristicError *heuristic_error,
+	                     SearchEngine const *search_engine);
 	~EagerLookaheadSearch() override = default;
 
 	EagerLookaheadSearch(const EagerLookaheadSearch &) = delete;
@@ -111,7 +114,8 @@ public:
 	                     std::shared_ptr<Evaluator> heuristic,
 	                     bool store_exploration_data,
 	                     ExpansionDelay *expansion_delay,
-	                     HeuristicError *heuristic_error);
+	                     HeuristicError *heuristic_error,
+	                     SearchEngine const *search_engine);
 	~AStarLookaheadSearch() override = default;
 
 	AStarLookaheadSearch(const AStarLookaheadSearch &) = delete;
@@ -129,7 +133,8 @@ public:
 	                            int lookahead_bound,
 	                            bool store_exploration_data,
 	                            ExpansionDelay *expansion_delay,
-	                            HeuristicError *heuristic_error);
+	                            HeuristicError *heuristic_error,
+	                            SearchEngine const *search_engine);
 	~BreadthFirstLookaheadSearch() override = default;
 
 	BreadthFirstLookaheadSearch(const BreadthFirstLookaheadSearch &) = delete;
@@ -151,7 +156,8 @@ public:
 	                    std::shared_ptr<Evaluator> distance,
 	                    bool store_exploration_data,
 	                    ExpansionDelay *expansion_delay,
-	                    HeuristicError &heuristic_error);
+	                    HeuristicError &heuristic_error,
+                      SearchEngine const *search_engine);
 	~FHatLookaheadSearch() override = default;
 
 	FHatLookaheadSearch(const FHatLookaheadSearch &) = delete;

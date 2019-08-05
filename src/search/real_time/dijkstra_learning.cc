@@ -4,11 +4,11 @@
 
 namespace real_time {
 
-DijkstraLearning::DijkstraLearning(std::shared_ptr<LearningEvaluator> learning_evaluator, const StateRegistry &state_registry)
-	: learning_evaluator(learning_evaluator), distance_learning_evaluator(nullptr), state_registry(state_registry) {}
+DijkstraLearning::DijkstraLearning(std::shared_ptr<LearningEvaluator> learning_evaluator, const StateRegistry &state_registry, SearchEngine const *search_engine)
+	: learning_evaluator(learning_evaluator), distance_learning_evaluator(nullptr), state_registry(state_registry), search_engine(search_engine) {}
 
-DijkstraLearning::DijkstraLearning(std::shared_ptr<LearningEvaluator> learning_evaluator, std::shared_ptr<LearningEvaluator> distance_learning_evaluator, const StateRegistry &state_registry)
-	: learning_evaluator(learning_evaluator), distance_learning_evaluator(distance_learning_evaluator), state_registry(state_registry) {}
+DijkstraLearning::DijkstraLearning(std::shared_ptr<LearningEvaluator> learning_evaluator, std::shared_ptr<LearningEvaluator> distance_learning_evaluator, const StateRegistry &state_registry, SearchEngine const *search_engine)
+	: learning_evaluator(learning_evaluator), distance_learning_evaluator(distance_learning_evaluator), state_registry(state_registry), search_engine(search_engine) {}
 
 void DijkstraLearning::apply_updates(const std::unordered_map<StateID, std::vector<std::pair<StateID, OperatorProxy>>> &predecessors, const std::vector<StateID> &frontier, const std::unordered_set<StateID> &closed, bool evaluate_heuristic) const {
 	auto closed_copy = closed;
@@ -70,7 +70,7 @@ void DijkstraLearning::apply_updates(const std::unordered_map<StateID, std::vect
 			if (closed_it != std::end(closed)) {
 				assert(learning_evaluator->is_estimate_cached(predecessor));
 				const auto predecessor_h = learning_evaluator->get_cached_estimate(predecessor);
-				const auto new_h = h + get_adjusted_cost(op);
+				const auto new_h = h + search_engine->get_adjusted_cost(op);
 				if (predecessor_h > new_h) {
 					closed.erase(closed_it);
 					// NOTE: the base evaluator should not need to be checked for consistent heuristics

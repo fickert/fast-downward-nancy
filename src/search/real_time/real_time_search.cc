@@ -40,11 +40,11 @@ RealTimeSearch::RealTimeSearch(const options::Options &opts)
   case LearningMethod::DIJKSTRA:
     dijkstra_learning = std::make_unique<DijkstraLearning>(std::static_pointer_cast<LearningEvaluator>(heuristic),
                                                            std::static_pointer_cast<LearningEvaluator>(distance_heuristic),
-                                                           state_registry);
+                                                           state_registry,
+                                                           this);
     break;
   case LearningMethod::NANCY:
-    const StateRegistry &csr = state_registry;
-    nancy_learning = std::make_unique<NancyLearning>(csr);
+    nancy_learning = std::make_unique<NancyLearning>(state_registry, this);
     break;
   }
   bool const store_exploration_data = learning_method != LearningMethod::NONE;
@@ -52,16 +52,16 @@ RealTimeSearch::RealTimeSearch(const options::Options &opts)
 
 	switch (LookaheadSearchMethod(opts.get_enum("lookahead_search"))) {
 	case LookaheadSearchMethod::A_STAR:
-		lookahead_search = std::make_unique<AStarLookaheadSearch>(state_registry, opts.get<int>("lookahead_bound"), heuristic, store_exploration_data, expansion_delay.get(), heuristic_error.get());
+		lookahead_search = std::make_unique<AStarLookaheadSearch>(state_registry, opts.get<int>("lookahead_bound"), heuristic, store_exploration_data, expansion_delay.get(), heuristic_error.get(), this);
 		break;
 	case LookaheadSearchMethod::BREADTH_FIRST:
-		lookahead_search = std::make_unique<BreadthFirstLookaheadSearch>(state_registry, opts.get<int>("lookahead_bound"), store_exploration_data, expansion_delay.get(), heuristic_error.get());
+		lookahead_search = std::make_unique<BreadthFirstLookaheadSearch>(state_registry, opts.get<int>("lookahead_bound"), store_exploration_data, expansion_delay.get(), heuristic_error.get(), this);
 		break;
 	case LookaheadSearchMethod::F_HAT:
-		lookahead_search = std::make_unique<FHatLookaheadSearch>(state_registry, opts.get<int>("lookahead_bound"), heuristic, distance_heuristic, store_exploration_data, expansion_delay.get(), *heuristic_error);
+		lookahead_search = std::make_unique<FHatLookaheadSearch>(state_registry, opts.get<int>("lookahead_bound"), heuristic, distance_heuristic, store_exploration_data, expansion_delay.get(), *heuristic_error, this);
 		break;
 	case LookaheadSearchMethod::RISK:
-		lookahead_search = std::make_unique<RiskLookaheadSearch>(state_registry, opts.get<int>("lookahead_bound"), heuristic, base_heuristic, distance_heuristic, store_exploration_data, expansion_delay.get(), heuristic_error.get(), hstar_data.get(), post_expansion_belief_data.get());
+		lookahead_search = std::make_unique<RiskLookaheadSearch>(state_registry, opts.get<int>("lookahead_bound"), heuristic, base_heuristic, distance_heuristic, store_exploration_data, expansion_delay.get(), heuristic_error.get(), hstar_data.get(), post_expansion_belief_data.get(), this);
 		break;
 	default:
 		std::cerr << "unknown lookahead search method: " << opts.get_enum("lookahead_search") << std::endl;
