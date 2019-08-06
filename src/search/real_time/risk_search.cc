@@ -596,12 +596,12 @@ RiskLookaheadSearch::RiskLookaheadSearch(StateRegistry &state_registry, int look
 
 RiskLookaheadSearch::~RiskLookaheadSearch()
 {
-  for (auto b : raw_beliefs) {
-    delete b;
-  }
-  for (auto b : raw_post_beliefs) {
-    delete b;
-  }
+  // for (auto b : raw_beliefs) {
+  //   delete b;
+  // }
+  // for (auto b : raw_post_beliefs) {
+  //   delete b;
+  // }
 }
 
 
