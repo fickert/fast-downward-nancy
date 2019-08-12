@@ -113,10 +113,11 @@ void NancyLearning::apply_updates(const std::unordered_map<StateID, std::vector<
           assert(dstr.shift == s_post_belief.shift);
           assert(s_post_belief.distribution);
           p_post_belief.set_and_shift(s_post_belief, search_engine->get_adjusted_cost(op));
+          assert(std::abs(new_exp - p_belief.expected_cost()) < 0.001);
+          learning_queue.emplace(p_belief, p_id);
         }
 
-        assert(std::abs(new_exp - p_belief.expected_cost()) < 0.001);
-        learning_queue.emplace(p_belief, p_id);
+        //learning_queue.emplace(p_belief, p_id);
       }
     }
   }

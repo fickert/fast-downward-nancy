@@ -234,6 +234,8 @@ void RiskLookaheadSearch::initialize(const GlobalState &initial_state)
   auto root_node = search_space->get_node(initial_state);
   auto const cur_state_id = initial_state.get_id();
 
+  std::cout << "looking from " << cur_state_id << "\n";
+
   for (auto op_id : ops) {
     auto const op = task_proxy.get_operators()[op_id];
     auto const succ_state = state_registry.get_successor_state(initial_state, op);
