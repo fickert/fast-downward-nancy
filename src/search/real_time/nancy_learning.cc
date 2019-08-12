@@ -101,7 +101,7 @@ void NancyLearning::apply_updates(const std::unordered_map<StateID, std::vector<
 
         // only back up if the value increased
         auto const p_exp_cached = exp_cache[predecessor];
-        if (new_exp > p_exp_cached) {
+        if (new_exp >= p_exp_cached) {
           closed.erase(cls);
           // backup the main belief
           p_belief.set_and_shift(dstr, search_engine->get_adjusted_cost(op));
