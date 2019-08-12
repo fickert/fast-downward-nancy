@@ -46,7 +46,8 @@ void NancyLearning::apply_updates(const std::unordered_map<StateID, std::vector<
 
   for (const auto &state_id : closed) {
     auto const &state = state_registry.lookup_state(state_id);
-    exp_cache[state] = std::numeric_limits<double>::infinity();
+    exp_cache[state] = (*beliefs)[state].expected_value;
+    (*beliefs)[state].expected_value = std::numeric_limits<double>::infinity();
   }
 
   for (const auto &state_id : frontier) {
@@ -80,11 +81,13 @@ void NancyLearning::apply_updates(const std::unordered_map<StateID, std::vector<
       if (closed.find(p_id) == closed.end()) {
         continue;
       }
+
       auto const &predecessor = state_registry.lookup_state(p_id);
-      auto const p_exp_cached = exp_cache[predecessor];
       assert(p_exp_cached >= 0.0);
       auto const new_exp = dstr.expected_cost() + search_engine->get_adjusted_cost(op);
-      if (p_exp_cached > new_exp) {
+      ShiftedDistribution &p_belief = (*beliefs)[predecessor];
+      auto const p_exp = p_belief.expected_cost();
+      if (p_exp > new_exp) {
         // to be clear here:
         // - the belief is only backed up if its expected value increased
         //   compared to before.
@@ -94,14 +97,15 @@ void NancyLearning::apply_updates(const std::unordered_map<StateID, std::vector<
         // - the new expected value for the predecessor will be the
         //   current state's expected value + the operator cost which is
         //   the same as the expected value of the raw distribution + shift
-        closed.erase(cls);
-        ShiftedDistribution &p_belief = (*beliefs)[predecessor];
-        auto const p_exp = p_belief.expected_cost();
+        //closed.erase(cls);
 
         // only back up if the value increased
-        if (new_exp > p_exp) {
+        auto const p_exp_cached = exp_cache[predecessor];
+        if (new_exp > p_exp_cached) {
+          closed.erase(cls);
           // backup the main belief
           p_belief.set_and_shift(dstr, search_engine->get_adjusted_cost(op));
+          // std::cout << "state " << p_id << " gets belief with exp " << new_exp << " from " << state_id << "\n";
 
           // backup the post expansion belief
           ShiftedDistribution &p_post_belief = (*post_beliefs)[predecessor];
