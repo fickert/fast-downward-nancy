@@ -12,8 +12,7 @@ NancyLearning::NancyLearning(StateRegistry const &state_registry, SearchEngine c
 {
 }
 
-void NancyLearning::apply_updates(const std::unordered_map<StateID,
-                                  std::vector<std::pair<StateID, OperatorProxy>>> &predecessors,
+void NancyLearning::apply_updates(const std::unordered_map<StateID, std::vector<std::pair<StateID, OperatorProxy>>> &predecessors,
                                   const std::vector<StateID> &frontier,
                                   const std::unordered_set<StateID> &closed,
                                   PerStateInformation<ShiftedDistribution> *beliefs,
@@ -34,23 +33,26 @@ struct LearningQueueComp
   }
 };
 
-void NancyLearning::apply_updates(const std::unordered_map<StateID,
-                                  std::vector<std::pair<StateID,
-                                  OperatorProxy>>> &predecessors, const std::vector<StateID> &frontier,
+void NancyLearning::apply_updates(const std::unordered_map<StateID, std::vector<std::pair<StateID, OperatorProxy>>> &predecessors,
+                                  const std::vector<StateID> &frontier,
                                   std::unordered_set<StateID> &&closed,
                                   PerStateInformation<ShiftedDistribution> *beliefs,
                                   PerStateInformation<ShiftedDistribution> *post_beliefs) const
 {
 	auto learning_queue = std::priority_queue<LearningQueueEntry, std::vector<LearningQueueEntry>, LearningQueueComp>();
 
+  // this stores the running expected values for dijkstra backup
+  PerStateInformation<double> exp_cache(-1.0);
+
   for (const auto &state_id : closed) {
     auto const &state = state_registry.lookup_state(state_id);
-    (*beliefs)[state].expected_value = std::numeric_limits<double>::infinity();
+    exp_cache[state] = std::numeric_limits<double>::infinity();
   }
 
   for (const auto &state_id : frontier) {
     auto const &state = state_registry.lookup_state(state_id);
     learning_queue.emplace((*beliefs)[state], state_id);
+    exp_cache[state] = (*beliefs)[state].expected_cost();
     closed.erase(state_id);
   }
 
@@ -61,7 +63,9 @@ void NancyLearning::apply_updates(const std::unordered_map<StateID,
     learning_queue.pop();
     auto const &state = state_registry.lookup_state(state_id);
     assert((*beliefs)[state].distribution != nullptr);
-
+    // if (dstr.expected_cost() != (*beliefs)[state].expected_cost()) {
+    //   continue;
+    // }
     if (dstr.expected_value == std::numeric_limits<double>::infinity()) {
       continue;
     }
@@ -77,10 +81,13 @@ void NancyLearning::apply_updates(const std::unordered_map<StateID,
         continue;
       }
       auto const &predecessor = state_registry.lookup_state(p_id);
-      auto const p_exp = (*beliefs)[predecessor].expected_cost();
+      auto const p_exp_cached = exp_cache[predecessor];
+      assert(p_exp_cached >= 0.0);
       auto const new_exp = dstr.expected_cost() + search_engine->get_adjusted_cost(op);
-      if (p_exp > new_exp) {
+      if (p_exp_cached > new_exp) {
         // to be clear here:
+        // - the belief is only backed up if its expected value increased
+        //   compared to before.
         // - the new belief that's stored for the predecessor is
         //   1. the same raw distribution as the current state.
         //   2. a shift given by op cost + the shift for the current state.
@@ -88,17 +95,21 @@ void NancyLearning::apply_updates(const std::unordered_map<StateID,
         //   current state's expected value + the operator cost which is
         //   the same as the expected value of the raw distribution + shift
         closed.erase(cls);
-
-        // backup the main belief
         ShiftedDistribution &p_belief = (*beliefs)[predecessor];
-        p_belief.set_and_shift(dstr, search_engine->get_adjusted_cost(op));
+        auto const p_exp = p_belief.expected_cost();
 
-        // backup the post expansion belief
-        ShiftedDistribution &p_post_belief = (*post_beliefs)[predecessor];
-        ShiftedDistribution &s_post_belief = (*post_beliefs)[state];
-        assert(dstr.shift == s_post_belief.shift);
-        assert(s_post_belief.distribution);
-        p_post_belief.set_and_shift(s_post_belief, search_engine->get_adjusted_cost(op));
+        // only back up if the value increased
+        if (new_exp > p_exp) {
+          // backup the main belief
+          p_belief.set_and_shift(dstr, search_engine->get_adjusted_cost(op));
+
+          // backup the post expansion belief
+          ShiftedDistribution &p_post_belief = (*post_beliefs)[predecessor];
+          ShiftedDistribution &s_post_belief = (*post_beliefs)[state];
+          assert(dstr.shift == s_post_belief.shift);
+          assert(s_post_belief.distribution);
+          p_post_belief.set_and_shift(s_post_belief, search_engine->get_adjusted_cost(op));
+        }
 
         assert(std::abs(new_exp - p_belief.expected_cost()) < 0.001);
         learning_queue.emplace(p_belief, p_id);
