@@ -289,11 +289,6 @@ void RiskLookaheadSearch::initialize(const GlobalState &initial_state)
   mark_expanded(root_node);
   statistics->inc_generated(tlas.size());
 
-  auto *dead_distribution = new DiscreteDistribution(1);
-  // hack to make a distribution with one value at infinity
-  dead_distribution->createFromUniform(1, std::numeric_limits<double>::infinity(), 0);
-  dead_end_belief.set(dead_distribution, 0);
-
   if (heuristic_error)
     heuristic_error->update_error();
 }
@@ -412,6 +407,7 @@ void RiskLookaheadSearch::backup_beliefs()
     // list that is owned by the tla
     while (1) {
       if (tlas.open_lists[tla_id].empty()) {
+        // TODO: not sure if this is what we want to do.
         tlas.beliefs[tla_id] = dead_end_belief;
         break;
       }
@@ -585,6 +581,7 @@ RiskLookaheadSearch::RiskLookaheadSearch(StateRegistry &state_registry, int look
     base_heuristic(base_heuristic),
     distance_heuristic(distance),
     beliefs(),
+    post_beliefs(),
     hstar_data(hstar_data),
     post_expansion_belief_data(post_expansion_belief_data),
     hstar_gaussian_fallback_count(0),
@@ -600,6 +597,11 @@ RiskLookaheadSearch::RiskLookaheadSearch(StateRegistry &state_registry, int look
   // this way we always have data for the goal state.
   raw_beliefs.push_back(new DiscreteDistribution(1, 0.0));
   raw_post_beliefs.push_back(new DiscreteDistribution(1, 0.0));
+
+  auto *dead_distribution = new DiscreteDistribution(1);
+  // hack to make a distribution with one value at infinity
+  dead_distribution->createFromUniform(1, std::numeric_limits<double>::infinity(), 0);
+  dead_end_belief.set(dead_distribution, 0);
 }
 
 RiskLookaheadSearch::~RiskLookaheadSearch()
