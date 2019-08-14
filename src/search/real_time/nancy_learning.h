@@ -18,13 +18,15 @@ public:
                      const std::vector<StateID> &frontier,
                      const std::unordered_set<StateID> &closed,
                      PerStateInformation<ShiftedDistribution> *beliefs,
-                     PerStateInformation<ShiftedDistribution> *post_beliefs) const;
+                     PerStateInformation<ShiftedDistribution> *post_beliefs,
+                     GlobalState const &current_state) const;
 
   void apply_updates(const std::unordered_map<StateID, std::vector<std::pair<StateID, OperatorProxy>>> &predecessors,
                      const std::vector<StateID> &frontier,
                      std::unordered_set<StateID> &&closed,
                      PerStateInformation<ShiftedDistribution> *beliefs,
-                     PerStateInformation<ShiftedDistribution> *post_beliefs) const;
+                     PerStateInformation<ShiftedDistribution> *post_beliefs,
+                     GlobalState const &current_state) const;
 };
 
 // class NancyLearning

@@ -184,7 +184,7 @@ SearchStatus RealTimeSearch::step() {
       auto post_beliefs = lookahead_search->get_post_beliefs();
       assert(beliefs != nullptr);
       assert(post_beliefs != nullptr);
-      nancy_learning->apply_updates(lookahead_search->get_predecessors(), lookahead_search->get_frontier(), lookahead_search->get_closed(), beliefs, post_beliefs);
+      nancy_learning->apply_updates(lookahead_search->get_predecessors(), lookahead_search->get_frontier(), lookahead_search->get_closed(), beliefs, post_beliefs, current_state);
     }
     break;
   }

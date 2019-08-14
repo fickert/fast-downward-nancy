@@ -16,10 +16,11 @@ void NancyLearning::apply_updates(const std::unordered_map<StateID, std::vector<
                                   const std::vector<StateID> &frontier,
                                   const std::unordered_set<StateID> &closed,
                                   PerStateInformation<ShiftedDistribution> *beliefs,
-                                  PerStateInformation<ShiftedDistribution> *post_beliefs) const
+                                  PerStateInformation<ShiftedDistribution> *post_beliefs,
+                                  GlobalState const &current_state) const
 {
   auto closed_copy = closed;
-  apply_updates(predecessors, frontier, std::move(closed_copy), beliefs, post_beliefs);
+  apply_updates(predecessors, frontier, std::move(closed_copy), beliefs, post_beliefs, current_state);
 }
 
 
@@ -37,9 +38,11 @@ void NancyLearning::apply_updates(const std::unordered_map<StateID, std::vector<
                                   const std::vector<StateID> &frontier,
                                   std::unordered_set<StateID> &&closed,
                                   PerStateInformation<ShiftedDistribution> *beliefs,
-                                  PerStateInformation<ShiftedDistribution> *post_beliefs) const
+                                  PerStateInformation<ShiftedDistribution> *post_beliefs,
+                                  GlobalState const &current_state) const
 {
 	auto learning_queue = std::priority_queue<LearningQueueEntry, std::vector<LearningQueueEntry>, LearningQueueComp>();
+  auto initial_id = current_state.get_id();
 
   // this stores the running expected values for dijkstra backup
   PerStateInformation<double> exp_cache(-1.0);
@@ -99,13 +102,16 @@ void NancyLearning::apply_updates(const std::unordered_map<StateID, std::vector<
         //   the same as the expected value of the raw distribution + shift
         //closed.erase(cls);
 
-        // only back up if the value increased
+        // only back up if the value increased (strictly increasing
+        // for initial state to prevent running in cycles)
         auto const p_exp_cached = exp_cache[predecessor];
-        if (new_exp > p_exp_cached) {
+        bool const should_learn = (p_id == initial_id && new_exp > p_exp_cached)
+                               || (p_id != initial_id && new_exp >= p_exp_cached);
+        if (should_learn) {
           closed.erase(cls);
           // backup the main belief
           p_belief.set_and_shift(dstr, search_engine->get_adjusted_cost(op));
-          // std::cout << "state " << p_id << " gets belief with exp " << new_exp << " from " << state_id << "\n";
+          //std::cout << "state " << p_id << " gets belief with exp " << new_exp << " from " << state_id << "\n";
 
           // backup the post expansion belief
           ShiftedDistribution &p_post_belief = (*post_beliefs)[predecessor];
