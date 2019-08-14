@@ -45,18 +45,18 @@ void NancyLearning::apply_updates(const std::unordered_map<StateID, std::vector<
   auto initial_id = current_state.get_id();
 
   // this stores the running expected values for dijkstra backup
-  PerStateInformation<double> exp_cache(-1.0);
+  std::unordered_map<StateID, double> exp_cache;
 
   for (const auto &state_id : closed) {
     auto const &state = state_registry.lookup_state(state_id);
-    exp_cache[state] = (*beliefs)[state].expected_value;
+    exp_cache[state_id] = (*beliefs)[state].expected_value;
     (*beliefs)[state].expected_value = std::numeric_limits<double>::infinity();
   }
 
   for (const auto &state_id : frontier) {
     auto const &state = state_registry.lookup_state(state_id);
     learning_queue.emplace((*beliefs)[state], state_id);
-    exp_cache[state] = (*beliefs)[state].expected_cost();
+    exp_cache[state_id] = (*beliefs)[state].expected_cost();
     closed.erase(state_id);
   }
 
@@ -104,9 +104,10 @@ void NancyLearning::apply_updates(const std::unordered_map<StateID, std::vector<
 
         // only back up if the value increased (strictly increasing
         // for initial state to prevent running in cycles)
-        auto const p_exp_cached = exp_cache[predecessor];
-        bool const should_learn = (p_id == initial_id && new_exp > p_exp_cached)
-                               || (p_id != initial_id && new_exp >= p_exp_cached);
+        auto const p_exp_cached = exp_cache[p_id];
+        bool const should_learn =
+             (p_id == initial_id && new_exp > p_exp_cached)
+          || (p_id != initial_id && new_exp >= p_exp_cached);
         if (should_learn) {
           closed.erase(cls);
           // backup the main belief
@@ -120,11 +121,22 @@ void NancyLearning::apply_updates(const std::unordered_map<StateID, std::vector<
           assert(s_post_belief.distribution);
           p_post_belief.set_and_shift(s_post_belief, search_engine->get_adjusted_cost(op));
           assert(std::abs(new_exp - p_belief.expected_cost()) < 0.001);
-          learning_queue.emplace(p_belief, p_id);
+          // learning_queue.emplace(p_belief, p_id);
         }
 
-        //learning_queue.emplace(p_belief, p_id);
+        learning_queue.emplace(p_belief, p_id);
       }
+    }
+  }
+
+  // We may not learn a new value for each node in the local search
+  // space.  Then their values are still at inf.  So we need to reset
+  // them
+  for (const auto &p : exp_cache) {
+    auto const &state = state_registry.lookup_state(p.first);
+    if ((*beliefs)[state].expected_value == std::numeric_limits<double>::infinity()) {
+      //std::cout << "resetting to previous belief\n";
+      (*beliefs)[state].expected_value = p.second;
     }
   }
 }
