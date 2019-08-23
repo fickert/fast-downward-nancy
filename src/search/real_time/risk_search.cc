@@ -34,12 +34,15 @@ void make_state_owner(std::unordered_map<StateID, std::vector<int> > &state_owne
   assert(state_owners[state_id].size() == 1);
 }
 
-void add_state_owner(std::unordered_map<StateID, std::vector<int> > &state_owners, StateID state_id, int tla_id)
+bool add_state_owner(std::unordered_map<StateID, std::vector<int> > &state_owners, StateID state_id, int tla_id)
 {
   auto owners = state_owners[state_id];
   auto found = std::find(std::begin(owners), std::end(owners), tla_id);
   if (found == owners.end()) {
     owners.push_back(tla_id);
+    return true;
+  } else {
+    return false;
   }
 }
 
@@ -183,7 +186,9 @@ ShiftedDistribution RiskLookaheadSearch::get_post_belief(StateID state_id)
 
 size_t TLAs::size() const
 {
+  //std::cout << ops.size() << ", " << op_costs.size() << ", " << open_lists.size() << ", " << beliefs.size() << ", " << states.size() << ", " << eval_contexts.size() << "\n";
   assert(ops.size() == open_lists.size() &&
+         ops.size() == op_costs.size() &&
          ops.size() == beliefs.size() &&
          ops.size() == states.size() &&
          ops.size() == eval_contexts.size());
@@ -193,8 +198,10 @@ size_t TLAs::size() const
 void TLAs::clear()
 {
   ops.clear();
+  op_costs.clear();
   open_lists.clear();
   beliefs.clear();
+  post_beliefs.clear();
   states.clear();
   eval_contexts.clear();
 }
@@ -202,20 +209,22 @@ void TLAs::clear()
 void TLAs::reserve(size_t n)
 {
   ops.reserve(n);
+  op_costs.reserve(n);
   open_lists.reserve(n);
   beliefs.reserve(n);
+  post_beliefs.reserve(n);
   states.reserve(n);
   eval_contexts.reserve(n);
 }
 
-StateID TLAs::min(size_t tla_id) const
+TLAs::QueueEntry const &TLAs::min(size_t tla_id) const
 {
-  return open_lists[tla_id].top().second;
+  return open_lists[tla_id].top();
 }
 
-StateID TLAs::remove_min(size_t tla_id)
+TLAs::QueueEntry TLAs::remove_min(size_t tla_id)
 {
-  StateID res = min(tla_id);
+  auto res = min(tla_id);
   open_lists[tla_id].pop();
   return res;
 }
@@ -233,8 +242,9 @@ void RiskLookaheadSearch::initialize(const GlobalState &initial_state)
   successor_generator.generate_applicable_ops(initial_state, ops);
   auto root_node = search_space->get_node(initial_state);
   auto const cur_state_id = initial_state.get_id();
+  tlas.current_state = &initial_state;
 
-  std::cout << "looking from " << cur_state_id << "\n";
+  std::cout << "looking from " << cur_state_id <<  ", h_hat: " << beliefs[initial_state].expected_cost() << "\n";
 
   for (auto op_id : ops) {
     auto const op = task_proxy.get_operators()[op_id];
@@ -242,17 +252,19 @@ void RiskLookaheadSearch::initialize(const GlobalState &initial_state)
     auto const succ_state_id = succ_state.get_id();
     auto succ_node = search_space->get_node(succ_state);
     auto const adj_cost = search_engine->get_adjusted_cost(op);
-    if (succ_node.is_new())
-      succ_node.open(root_node, op, adj_cost);
-    else if (!succ_node.is_dead_end() && adj_cost < succ_node.get_g())
-      succ_node.reopen(root_node, op, adj_cost);
-    else
+    auto const succ_g = adj_cost;
+    if (succ_node.is_new()) {
+      succ_node.open(root_node, op, succ_g);
+    } else if (!succ_node.is_dead_end() && succ_g < succ_node.get_g()) {
+      succ_node.reopen(root_node, op, succ_g);
+    } else {
       continue;
+    }
 
     if (store_exploration_data)
       predecessors[succ_state_id].emplace_back(cur_state_id, op);
 
-    auto eval_context = EvaluationContext(succ_state, succ_node.get_g(), false, statistics.get());
+    auto eval_context = EvaluationContext(succ_state, succ_g, false, statistics.get());
     if (eval_context.is_evaluator_value_infinite(heuristic.get()) || eval_context.is_evaluator_value_infinite(distance_heuristic.get())) {
       succ_node.mark_as_dead_end();
       statistics->inc_dead_ends();
@@ -260,6 +272,7 @@ void RiskLookaheadSearch::initialize(const GlobalState &initial_state)
     }
 
     tlas.ops.push_back(op_id);
+    tlas.op_costs.push_back(adj_cost);
 
     // add the belief
     tlas.beliefs.push_back(get_belief(eval_context));
@@ -267,10 +280,13 @@ void RiskLookaheadSearch::initialize(const GlobalState &initial_state)
 
     // add the node to this tla's open list
     tlas.open_lists.emplace_back();
-    tlas.open_lists.back().emplace(NodeEvaluation(static_cast<double>(succ_node.get_g())
-                                                  + tlas.beliefs.back().expected_cost(),
+    tlas.open_lists.back().emplace(NodeEvaluation(tlas.beliefs.back().expected_cost(),
+                                                  succ_g,
                                                   eval_context.get_result(heuristic.get()).get_evaluator_value()),
                                    succ_state_id);
+
+    // add the tla state
+    tlas.states.emplace_back(succ_state_id, tlas.beliefs.back().expected_cost());
 
     // add the context for the tla's state
     tlas.eval_contexts.emplace_back(std::move(eval_context));
@@ -280,6 +296,7 @@ void RiskLookaheadSearch::initialize(const GlobalState &initial_state)
     }
     // make the tla own the state of the top level node (I assume
     // here, that the state of all top level nodes are distinct)
+    assert(state_owners[succ_state_id].empty());
     make_state_owner(state_owners, succ_state_id, static_cast<int>(tlas.ops.size()) - 1);
 
     if (heuristic_error)
@@ -291,6 +308,26 @@ void RiskLookaheadSearch::initialize(const GlobalState &initial_state)
 
   if (heuristic_error)
     heuristic_error->update_error();
+
+
+#ifndef DNDEBUG
+  for (size_t i = 0; i < tlas.size(); ++i) {
+    assert(tlas.open_lists[i].size() == 1);
+
+    if (!(tlas.post_beliefs[i].expected_cost() -
+          (get_post_belief(tlas.min(i).second).expected_cost() + tlas.min(i).first.g - tlas.op_costs[i])
+          < 0.01)) {
+      std::cout << i << ", "
+                << (void*)tlas.post_beliefs[i].distribution << ", "
+                << tlas.post_beliefs[i].expected_cost() << ", "
+                << (void*)get_post_belief(tlas.min(i).second).distribution << ", "
+                << get_post_belief(tlas.min(i).second).expected_cost() << ", "
+                << tlas.min(i).first.g << ", "
+                << tlas.op_costs[i] << "\n";
+      assert(false);
+    }
+  }
+#endif
 }
 
 double RiskLookaheadSearch::risk_analysis(size_t const alpha, const vector<ShiftedDistribution> &est_beliefs) const
@@ -341,8 +378,11 @@ size_t RiskLookaheadSearch::select_tla()
       continue;
     }
     assert(expansion_delay);
+    assert(tlas.post_beliefs[i].expected_cost() -
+           (get_post_belief(tlas.open_lists[i].top().second).expected_cost() + tlas.open_lists[i].top().first.g - tlas.op_costs[i])
+           < 0.01);
+
     // Simulate how expanding this TLA's best node would affect its belief
-    assert(tlas.post_beliefs[i].expected_cost() == get_post_belief(tlas.open_lists[i].top().second).expected_cost());
     ShiftedDistribution post_i = tlas.post_beliefs[i];
     assert(post_i.distribution);
     // swap in the estimated post expansion belief
@@ -400,6 +440,7 @@ size_t RiskLookaheadSearch::select_tla()
 // nancy just backs up the top of the open list
 void RiskLookaheadSearch::backup_beliefs()
 {
+  // std::cout << "backing up beliefs\n";
   // note that we need to update all beliefs, because one tla can
   // potentially "steal" the currently best belief of another tla
   for (size_t tla_id = 0; tla_id < tlas.size(); ++tla_id) {
@@ -413,20 +454,25 @@ void RiskLookaheadSearch::backup_beliefs()
       }
 
       // get the best state from open
-      auto const state_id = tlas.min(tla_id);
+      auto const &best_state = tlas.min(tla_id);
+      auto const state_id = best_state.second;
+      // we want the g from best_state to top level node, not to root
+      auto const g = best_state.first.g - tlas.op_costs[tla_id];
       // only consider this state if we own it
       if (state_owned_by_tla(state_owners, state_id, tla_id)) {
         // only do backup if it's a different state from last time
-        if (state_id != tlas.states[tla_id]) {
-          tlas.states[tla_id] = state_id;
+        if (state_id != tlas.states[tla_id].first) {
           auto best_state = state_registry.lookup_state(state_id);
-          auto best_node = search_space->get_node(best_state);
           // every known node should have a known belief
           assert(beliefs[best_state].distribution != nullptr);
           assert(post_beliefs[best_state].distribution != nullptr);
-          tlas.beliefs[tla_id] = beliefs[best_state];
-          tlas.post_beliefs[tla_id] = post_beliefs[best_state];
-          tlas.eval_contexts[tla_id] = EvaluationContext(best_state, best_node.get_g(), false, statistics.get());
+
+          tlas.states[tla_id] = std::make_pair(state_id, beliefs[best_state].expected_cost());
+
+          tlas.beliefs[tla_id].set_and_shift(beliefs[best_state], g);
+          tlas.post_beliefs[tla_id].set_and_shift(post_beliefs[best_state], g);
+          tlas.eval_contexts[tla_id] = EvaluationContext(best_state, g, false, statistics.get());
+          assert(beliefs[best_state].expected_cost() + g - tlas.beliefs[tla_id].expected_cost() < 0.01);
         }
         // we're done in any case, since we found the best owned node
         // for this tla.
@@ -436,11 +482,11 @@ void RiskLookaheadSearch::backup_beliefs()
       }
     }
   }
+
 }
 
 SearchStatus RiskLookaheadSearch::search()
 {
-
   assert(statistics);
   while (statistics->get_expanded() < lookahead_bound) {
     if (tlas.size() == 0u) {
@@ -449,6 +495,7 @@ SearchStatus RiskLookaheadSearch::search()
 
     // setup work: find tla to expand under
     backup_beliefs();
+
     int tla_id = select_tla();
     if (tlas.open_lists[tla_id].empty()) {
       // Note: this is safe, we'll never try to expand an empty tla,
@@ -456,16 +503,15 @@ SearchStatus RiskLookaheadSearch::search()
       return FAILED;
     }
 
-
     // get the state to expand, discarding states that are not owned
-    StateID state_id = tlas.remove_min(tla_id);
+    StateID state_id = tlas.remove_min(tla_id).second;
     while (1) {
       if (state_owned_by_tla(state_owners, state_id, tla_id))
         break;
       if (tlas.open_lists[tla_id].empty()) {
         return FAILED;
       }
-      state_id = tlas.remove_min(tla_id);
+      state_id = tlas.remove_min(tla_id).second;
     }
 
     auto state = state_registry.lookup_state(state_id);
@@ -495,6 +541,7 @@ SearchStatus RiskLookaheadSearch::search()
       const auto succ_state_id = succ_state.get_id();
       statistics->inc_generated();
       auto succ_node = search_space->get_node(succ_state);
+      auto succ_g = node.get_g() + adj_cost;
 
       if (store_exploration_data)
         predecessors[succ_state_id].emplace_back(state_id, op);
@@ -502,7 +549,7 @@ SearchStatus RiskLookaheadSearch::search()
       if (succ_node.is_dead_end())
         continue;
 
-      auto succ_eval_context = EvaluationContext(succ_state, node.get_g() + adj_cost, false, statistics.get());
+      auto succ_eval_context = EvaluationContext(succ_state, succ_g, false, statistics.get());
 
       if (succ_node.is_new()) {
         statistics->inc_evaluated_states();
@@ -516,8 +563,8 @@ SearchStatus RiskLookaheadSearch::search()
         }
         succ_node.open(node, op, adj_cost);
         auto belief = get_belief(succ_eval_context);
-        tlas.open_lists[tla_id].emplace(NodeEvaluation(static_cast<double>(node.get_g())
-                                                       + belief.expected_cost(),
+        tlas.open_lists[tla_id].emplace(NodeEvaluation(belief.expected_cost(),
+                                                       succ_g,
                                                        succ_eval_context.get_result(heuristic.get()).get_evaluator_value()),
                                         succ_state_id);
         make_state_owner(state_owners, succ_state_id, tla_id);
@@ -525,23 +572,33 @@ SearchStatus RiskLookaheadSearch::search()
         auto const old_g = succ_node.get_g();
         auto const new_g = node.get_g() + adj_cost;
         if (old_g > new_g) {
+          // new cheapest path to this state
           if (succ_node.is_closed())
             statistics->inc_reopened();
           succ_node.reopen(node, op, adj_cost);
           auto belief = get_belief(succ_eval_context);
-          tlas.open_lists[tla_id].emplace(NodeEvaluation(static_cast<double>(node.get_g())
-                                                       + belief.expected_cost(),
+          tlas.open_lists[tla_id].emplace(NodeEvaluation(belief.expected_cost(),
+                                                         new_g,
                                                          succ_eval_context.get_result(heuristic.get()).get_evaluator_value()),
                                           succ_state_id);
-
-          if (old_g != new_g) {
-            // new cheapest path to this state
-            make_state_owner(state_owners, succ_state_id, tla_id);
-          } else {
-            // there are cheapest paths below more than one tla leading to this state
-            add_state_owner(state_owners, succ_state_id, tla_id);
-          }
+          make_state_owner(state_owners, succ_state_id, tla_id);
         }
+        // TODO: not sure if this part is really necessary or even desriable.
+        // It definitely breaks with 0 cost actions.
+        // else if (old_g == new_g) {
+        //   // optimal alternative to get to this state
+        //   bool new_owner = add_state_owner(state_owners, succ_state_id, tla_id);
+        //   if (new_owner) {
+        //     if (succ_node.is_closed())
+        //       statistics->inc_reopened();
+        //     succ_node.reopen(node, op, adj_cost);
+        //     auto belief = get_belief(succ_eval_context);
+        //     tlas.open_lists[tla_id].emplace(NodeEvaluation(belief.expected_cost(),
+        //                                                    new_g,
+        //                                                    succ_eval_context.get_result(heuristic.get()).get_evaluator_value()),
+        //                                     succ_state_id);
+        //   }
+        // }
       }
 
       open_list_insertion_time[state_id] = statistics->get_expanded();
@@ -552,14 +609,30 @@ SearchStatus RiskLookaheadSearch::search()
       heuristic_error->update_error();
   }
 
+  // backup once more after we're out of expansions
+  backup_beliefs();
+
+  // std::cout << "tla belief expected values: ";
+  // for (size_t i = 0; i < tlas.size(); ++i) {
+  //   std::cout << "(" << tlas.beliefs[i].expected_cost() << ", " << tlas.op_costs[i] << "), ";
+  // }
+  // std::cout << "\n";
+
   // collect the frontiers of all tlas
   for (size_t i = 0; i < tlas.open_lists.size(); ++i) {
     while (!tlas.open_lists[i].empty()) {
-      StateID state_id = tlas.remove_min(i);
+      StateID state_id = tlas.remove_min(i).second;
       if (state_owned_by_tla(state_owners, state_id, i))
         frontier.push_back(state_id);
     }
   }
+
+#ifndef DNDEBUG
+  for (size_t i = 0; i < tlas.size(); ++i) {
+    assert(std::find(frontier.begin(), frontier.end(), tlas.states[i].first) != frontier.end());
+  }
+#endif
+
   return IN_PROGRESS;
 }
 

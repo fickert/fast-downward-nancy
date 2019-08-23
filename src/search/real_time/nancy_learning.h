@@ -8,24 +8,26 @@ namespace real_time
 {
 class NancyLearning
 {
+  using Beliefs = PerStateInformation<ShiftedDistribution>;
   StateRegistry const &state_registry;
   SearchEngine const *search_engine; // need this just so I can call get_adjusted_cost
+  Beliefs *beliefs;
+  Beliefs *post_beliefs;
 
 public:
-	NancyLearning(StateRegistry const &state_registry, SearchEngine const *search_engine);
+	NancyLearning(StateRegistry const &state_registry,
+                SearchEngine const *search_engine,
+                Beliefs *beliefs,
+                Beliefs *post_beliefs);
 
   void apply_updates(const std::unordered_map<StateID, std::vector<std::pair<StateID, OperatorProxy>>> &predecessors,
                      const std::vector<StateID> &frontier,
                      const std::unordered_set<StateID> &closed,
-                     PerStateInformation<ShiftedDistribution> *beliefs,
-                     PerStateInformation<ShiftedDistribution> *post_beliefs,
                      GlobalState const &current_state) const;
 
   void apply_updates(const std::unordered_map<StateID, std::vector<std::pair<StateID, OperatorProxy>>> &predecessors,
                      const std::vector<StateID> &frontier,
                      std::unordered_set<StateID> &&closed,
-                     PerStateInformation<ShiftedDistribution> *beliefs,
-                     PerStateInformation<ShiftedDistribution> *post_beliefs,
                      GlobalState const &current_state) const;
 };
 

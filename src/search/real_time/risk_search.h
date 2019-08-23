@@ -21,9 +21,11 @@ namespace real_time
 // value, with h as tie breaker.
 struct NodeEvaluation
 {
-  double expected;
+  double expected; // g + h_hat
+  int g;
   int h;
-  NodeEvaluation(double d, int i) : expected(d), h(i) {}
+  NodeEvaluation(double h_hat, int g, int h)
+    : expected(h_hat + static_cast<double>(g)), g(g), h(h) {}
   ~NodeEvaluation() {}
 };
 
@@ -34,10 +36,13 @@ struct TLAs
     struct {
       bool operator()(QueueEntry const &l, QueueEntry const &r) const
       {
-       if (l.first.expected != r.first.expected)
+       if (l.first.expected != r.first.expected) {
          return l.first.expected > r.first.expected;
-       else
+       } else if (l.first.h != r.first.h) {
          return l.first.h > r.first.h;
+       } else {
+         return l.second.hash() < r.second.hash();
+       }
       }
     };
   using Queue =
@@ -45,26 +50,29 @@ struct TLAs
                         std::vector<QueueEntry>,
                         QueueEntryCompare>;
   std::vector<OperatorID> ops;
+  std::vector<int> op_costs;
   std::vector<Queue> open_lists;
   // backed up belief for each tla
   std::vector<ShiftedDistribution> beliefs;
   std::vector<ShiftedDistribution> post_beliefs;
-  // "states" stores the current best state of each tla.
-  std::vector<StateID> states;
-  // TODO: not sure if this is smart, setting up all these eval
-  // contexts
+  // "states" stores the current best state and h_hat in the frontier for each tla.
+  // h_hat is used later in the decision strategy, but I don't need the entire distribution there.
+  std::vector<std::pair<StateID, double> > states;
   std::vector<EvaluationContext> eval_contexts;
 
+  GlobalState const *current_state;
 
   void reserve(std::size_t n);
   void clear();
   size_t size() const;
-  StateID remove_min(size_t tla_id);
-  StateID min(size_t tla_id) const;
+  QueueEntry remove_min(size_t tla_id);
+  QueueEntry const &min(size_t tla_id) const;
 };
 
 class RiskLookaheadSearch : public LookaheadSearch
 {
+  using Beliefs = PerStateInformation<ShiftedDistribution>;
+
   std::shared_ptr<Evaluator> f_evaluator;
   std::shared_ptr<Evaluator> f_hat_evaluator;
   std::shared_ptr<Evaluator> heuristic;
@@ -76,8 +84,8 @@ class RiskLookaheadSearch : public LookaheadSearch
   // Since the distribution is always the same for a given h-value, they
   // are cached in raw_beliefs, same for the post_expansion
   // distributions.
-  PerStateInformation<ShiftedDistribution> beliefs;
-  PerStateInformation<ShiftedDistribution> post_beliefs;
+  Beliefs beliefs;
+  Beliefs post_beliefs;
   std::vector<DiscreteDistribution*> raw_beliefs;
   std::vector<DiscreteDistribution*> raw_post_beliefs;
   ShiftedDistribution dead_end_belief;
@@ -132,6 +140,7 @@ public:
   auto operator=(const RiskLookaheadSearch &) = delete;
   auto operator=(RiskLookaheadSearch &&) = delete;
 
+  auto get_tlas() -> TLAs const * { return &tlas; }
   auto get_beliefs() -> PerStateInformation<ShiftedDistribution> * { return &beliefs; }
   auto get_post_beliefs() -> PerStateInformation<ShiftedDistribution> * { return &post_beliefs; }
 };

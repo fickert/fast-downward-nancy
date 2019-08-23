@@ -18,6 +18,7 @@ namespace real_time {
 
 class HeuristicError;
 class ExpansionDelay;
+struct TLAs;
 
 class LookaheadSearch {
 	bool solution_found;
@@ -70,12 +71,13 @@ public:
 	auto get_plan() const -> const Plan & {return plan;}
 	auto get_statistics() const -> const SearchStatistics & {return *statistics;}
 
-	auto get_search_space() const -> SearchSpace & { return *search_space; }
+	auto get_search_space() const -> SearchSpace & { return *search_space.get(); }
 	auto get_frontier() const -> const decltype(frontier) & { return frontier; }
 	auto get_predecessors() const -> const decltype(predecessors) & { return predecessors; }
 	auto get_closed() const -> const decltype(closed) & { return closed; }
 
   // only implemented for lookahead search methods making use of distributions (risk)
+  virtual auto get_tlas() -> TLAs const * { return nullptr; }
   virtual auto get_beliefs() -> PerStateInformation<ShiftedDistribution> * { return nullptr; }
   virtual auto get_post_beliefs() -> PerStateInformation<ShiftedDistribution> * { return nullptr; }
 };

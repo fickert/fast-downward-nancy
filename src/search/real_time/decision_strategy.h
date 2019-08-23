@@ -10,8 +10,11 @@
 
 class SearchSpace;
 class StateRegistry;
+class SearchEngine;
 
 namespace real_time {
+
+struct TLAs;
 
 class DecisionStrategy {
 public:
@@ -32,17 +35,26 @@ public:
 	auto get_top_level_action(const std::vector<StateID> &frontier, SearchSpace &search_space) const -> OperatorID override;
 };
 
-class ProbabilisticDecisionStrategy : public DecisionStrategy
+class NancyDecisionStrategy
 {
-	const StateRegistry &state_registry;
-  PerStateInformation<ShiftedDistribution> const *beliefs;
+  // using Predecessors = std::unordered_map<StateID, std::vector<std::pair<StateID, OperatorProxy>>>;
+  // using Beliefs = PerStateInformation<ShiftedDistribution>;
+	// const StateRegistry &state_registry;
+  // PerStateInformation<ShiftedDistribution> const *beliefs;
+  const TLAs *tlas;
+  SearchEngine const &engine; // need this just so I can call get_adjusted_cost
+  // Beliefs const *beliefs;
+
+  double target_h_hat;
+  double target_f_hat;
+  std::vector<OperatorID> target_path;
 
 public:
-	ProbabilisticDecisionStrategy(const StateRegistry &state_registry, PerStateInformation<ShiftedDistribution> const *beliefs);
-	~ProbabilisticDecisionStrategy() override = default;
-  auto get_top_level_action(const std::vector<StateID> &frontier, SearchSpace &search_space) const -> OperatorID override;
+	NancyDecisionStrategy(TLAs const *tlas,
+                        SearchEngine const &engine);
+	~NancyDecisionStrategy() = default;
+  OperatorID pick_top_level_action(SearchSpace const &search_space);
 
-  virtual bool state_cheaper(const StateID &a, const StateID &b) const;
 };
 
 }

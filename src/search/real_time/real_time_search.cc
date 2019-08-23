@@ -33,23 +33,10 @@ RealTimeSearch::RealTimeSearch(const options::Options &opts)
 		heuristic = std::make_shared<LearningEvaluator>(heuristic);
 	initialize_optional_features(opts);
 
-  switch (learning_method) {
-  case LearningMethod::NONE:
-    dijkstra_learning = nullptr;
-    break;
-  case LearningMethod::DIJKSTRA:
-    dijkstra_learning = std::make_unique<DijkstraLearning>(std::static_pointer_cast<LearningEvaluator>(heuristic),
-                                                           std::static_pointer_cast<LearningEvaluator>(distance_heuristic),
-                                                           state_registry,
-                                                           this);
-    break;
-  case LearningMethod::NANCY:
-    nancy_learning = std::make_unique<NancyLearning>(state_registry, this);
-    break;
-  }
   bool const store_exploration_data = learning_method != LearningMethod::NONE;
   //bool const store_exploration_data = true;
 
+  std::cout << "initializing lookahead method\n";
 	switch (LookaheadSearchMethod(opts.get_enum("lookahead_search"))) {
 	case LookaheadSearchMethod::A_STAR:
 		lookahead_search = std::make_unique<AStarLookaheadSearch>(state_registry, opts.get<int>("lookahead_bound"), heuristic, store_exploration_data, expansion_delay.get(), heuristic_error.get(), this);
@@ -68,7 +55,27 @@ RealTimeSearch::RealTimeSearch(const options::Options &opts)
 		utils::exit_with(utils::ExitCode::SEARCH_INPUT_ERROR);
 	}
 
-	switch (DecisionStrategy(opts.get_enum("decision_strategy"))) {
+  std::cout << "initializing learning method\n";
+  switch (learning_method) {
+  case LearningMethod::NONE:
+    dijkstra_learning = nullptr;
+    break;
+  case LearningMethod::DIJKSTRA:
+    dijkstra_learning = std::make_unique<DijkstraLearning>(std::static_pointer_cast<LearningEvaluator>(heuristic),
+                                                           std::static_pointer_cast<LearningEvaluator>(distance_heuristic),
+                                                           state_registry,
+                                                           this);
+    break;
+  case LearningMethod::NANCY:
+    auto beliefs = lookahead_search->get_beliefs();
+    auto post_beliefs = lookahead_search->get_post_beliefs();
+    nancy_learning = std::make_unique<NancyLearning>(state_registry, this, beliefs, post_beliefs);
+    break;
+  }
+
+  std::cout << "initializing decision strat\n";
+  decision_strategy_type = DecisionStrategy(opts.get_enum("decision_strategy"));
+	switch (decision_strategy_type) {
 	case DecisionStrategy::MINIMIN: {
 		auto f_evaluator = std::make_shared<sum_evaluator::SumEvaluator>(std::vector<std::shared_ptr<Evaluator>>{heuristic, std::make_shared<g_evaluator::GEvaluator>()});
 		decision_strategy = std::make_unique<ScalarDecisionStrategy>(state_registry, [this, f_evaluator](const StateID &state_id, SearchSpace &lookahead_search_space) {
@@ -90,9 +97,10 @@ RealTimeSearch::RealTimeSearch(const options::Options &opts)
 		break;
 	}
 	case DecisionStrategy::NANCY: {
-    auto beliefs = this->lookahead_search->get_beliefs();
-    assert(beliefs);
-		decision_strategy = std::make_unique<ProbabilisticDecisionStrategy>(state_registry, beliefs);
+    auto const tlas = this->lookahead_search->get_tlas();
+    assert(tlas);
+    nancy_decision_strategy = std::make_unique<NancyDecisionStrategy>(tlas, *this);
+		decision_strategy = nullptr;
 		break;
 	}
 	default:
@@ -179,20 +187,25 @@ SearchStatus RealTimeSearch::step() {
     dijkstra_learning->apply_updates(lookahead_search->get_predecessors(), lookahead_search->get_frontier(), lookahead_search->get_closed(), evaluate_heuristic_when_learning);
     break;
   case LearningMethod::NANCY:
-    {
-      auto beliefs = lookahead_search->get_beliefs();
-      auto post_beliefs = lookahead_search->get_post_beliefs();
-      assert(beliefs != nullptr);
-      assert(post_beliefs != nullptr);
-      nancy_learning->apply_updates(lookahead_search->get_predecessors(), lookahead_search->get_frontier(), lookahead_search->get_closed(), beliefs, post_beliefs, current_state);
-    }
+    nancy_learning->apply_updates(lookahead_search->get_predecessors(), lookahead_search->get_frontier(), lookahead_search->get_closed(), current_state);
     break;
   }
 
-	const auto best_top_level_action = decision_strategy->get_top_level_action(lookahead_search->get_frontier(), lookahead_search->get_search_space());
+  OperatorID best_top_level_action(0);
+  switch (decision_strategy_type) {
+  case DecisionStrategy::NANCY:
+    assert(nancy_decision_strategy);
+    best_top_level_action = nancy_decision_strategy->pick_top_level_action(lookahead_search->get_search_space());
+    break;
+  default:
+    best_top_level_action = decision_strategy->get_top_level_action(lookahead_search->get_frontier(), lookahead_search->get_search_space());
+    break;
+  }
+	//const auto best_top_level_action = decision_strategy->get_top_level_action(lookahead_search->get_frontier(), lookahead_search->get_search_space());
 	const auto parent_node = search_space.get_node(current_state);
 	const auto op = task_proxy.get_operators()[best_top_level_action];
 	solution_cost += get_adjusted_cost(op);
+  // std::cout << "executing action " << op.get_name() << " with cost " << get_adjusted_cost(op) << "\n";
 	current_state = state_registry.get_successor_state(current_state, op);
 	auto next_node = search_space.get_node(current_state);
 	if (next_node.is_new())

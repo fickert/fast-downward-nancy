@@ -58,7 +58,12 @@ class RealTimeSearch : public SearchEngine {
   // unfortunately, because of non-trivial types
   std::unique_ptr<DijkstraLearning> dijkstra_learning;
   std::unique_ptr<NancyLearning> nancy_learning;
+  DecisionStrategy decision_strategy_type;
 	std::unique_ptr<real_time::DecisionStrategy> decision_strategy;
+
+  // having a separate pointer makes it much nicer than inheritance in
+  // this case
+  std::unique_ptr<NancyDecisionStrategy> nancy_decision_strategy;
 
 	std::shared_ptr<Evaluator> distance_heuristic;
 	std::unique_ptr<ExpansionDelay> expansion_delay;

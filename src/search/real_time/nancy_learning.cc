@@ -7,20 +7,21 @@
 namespace real_time
 {
 
-NancyLearning::NancyLearning(StateRegistry const &state_registry, SearchEngine const *search_engine)
-	: state_registry(state_registry), search_engine(search_engine)
+NancyLearning::NancyLearning(StateRegistry const &state_registry,
+                             SearchEngine const *search_engine,
+                             Beliefs *beliefs,
+                             Beliefs *post_beliefs)
+	: state_registry(state_registry), search_engine(search_engine), beliefs(beliefs), post_beliefs(post_beliefs)
 {
 }
 
 void NancyLearning::apply_updates(const std::unordered_map<StateID, std::vector<std::pair<StateID, OperatorProxy>>> &predecessors,
                                   const std::vector<StateID> &frontier,
                                   const std::unordered_set<StateID> &closed,
-                                  PerStateInformation<ShiftedDistribution> *beliefs,
-                                  PerStateInformation<ShiftedDistribution> *post_beliefs,
                                   GlobalState const &current_state) const
 {
   auto closed_copy = closed;
-  apply_updates(predecessors, frontier, std::move(closed_copy), beliefs, post_beliefs, current_state);
+  apply_updates(predecessors, frontier, std::move(closed_copy), current_state);
 }
 
 
@@ -37,26 +38,24 @@ struct LearningQueueComp
 void NancyLearning::apply_updates(const std::unordered_map<StateID, std::vector<std::pair<StateID, OperatorProxy>>> &predecessors,
                                   const std::vector<StateID> &frontier,
                                   std::unordered_set<StateID> &&closed,
-                                  PerStateInformation<ShiftedDistribution> *beliefs,
-                                  PerStateInformation<ShiftedDistribution> *post_beliefs,
                                   GlobalState const &current_state) const
 {
 	auto learning_queue = std::priority_queue<LearningQueueEntry, std::vector<LearningQueueEntry>, LearningQueueComp>();
   auto initial_id = current_state.get_id();
 
   // this stores the running expected values for dijkstra backup
-  std::unordered_map<StateID, double> exp_cache;
+  // std::unordered_map<StateID, double> exp_cache;
 
   for (const auto &state_id : closed) {
     auto const &state = state_registry.lookup_state(state_id);
-    exp_cache[state_id] = (*beliefs)[state].expected_value;
+    // exp_cache[state_id] = (*beliefs)[state].expected_value;
     (*beliefs)[state].expected_value = std::numeric_limits<double>::infinity();
   }
 
   for (const auto &state_id : frontier) {
     auto const &state = state_registry.lookup_state(state_id);
     learning_queue.emplace((*beliefs)[state], state_id);
-    exp_cache[state_id] = (*beliefs)[state].expected_cost();
+    // exp_cache[state_id] = (*beliefs)[state].expected_cost();
     closed.erase(state_id);
   }
 
@@ -74,6 +73,12 @@ void NancyLearning::apply_updates(const std::unordered_map<StateID, std::vector<
       continue;
     }
 
+    auto cls = closed.find(state_id);
+
+    if (cls != closed.end()) {
+      closed.erase(cls);
+    }
+
     auto preds = predecessors.find(state_id);
     if (preds == predecessors.end()) {
       continue;
@@ -81,12 +86,12 @@ void NancyLearning::apply_updates(const std::unordered_map<StateID, std::vector<
 
     for (auto const &[p_id, op] : preds->second) {
       auto cls = closed.find(p_id);
-      if (closed.find(p_id) == closed.end()) {
+      if (cls == closed.end()) {
         continue;
       }
 
       auto const &predecessor = state_registry.lookup_state(p_id);
-      assert(p_exp_cached >= 0.0);
+      //assert(p_exp_cached >= 0.0);
       auto const new_exp = dstr.expected_cost() + search_engine->get_adjusted_cost(op);
       ShiftedDistribution &p_belief = (*beliefs)[predecessor];
       auto const p_exp = p_belief.expected_cost();
@@ -104,15 +109,16 @@ void NancyLearning::apply_updates(const std::unordered_map<StateID, std::vector<
 
         // only back up if the value increased (strictly increasing
         // for initial state to prevent running in cycles)
-        auto const p_exp_cached = exp_cache[p_id];
-        bool const should_learn =
-             (p_id == initial_id && new_exp > p_exp_cached)
-          || (p_id != initial_id && new_exp >= p_exp_cached);
+        // auto const p_exp_cached = exp_cache[p_id];
+        // bool const should_learn =
+        //      (p_id == initial_id && new_exp > p_exp_cached)
+        //   || (p_id != initial_id && new_exp >= p_exp_cached);
+
+        bool const should_learn = true;
         if (should_learn) {
-          closed.erase(cls);
           // backup the main belief
           p_belief.set_and_shift(dstr, search_engine->get_adjusted_cost(op));
-          //std::cout << "state " << p_id << " gets belief with exp " << new_exp << " from " << state_id << "\n";
+          // std::cout << "state " << p_id << " gets belief with exp " << new_exp << " from " << state_id << "\n";
 
           // backup the post expansion belief
           ShiftedDistribution &p_post_belief = (*post_beliefs)[predecessor];
@@ -129,15 +135,13 @@ void NancyLearning::apply_updates(const std::unordered_map<StateID, std::vector<
     }
   }
 
-  // We may not learn a new value for each node in the local search
-  // space.  Then their values are still at inf.  So we need to reset
-  // them
-  for (const auto &p : exp_cache) {
-    auto const &state = state_registry.lookup_state(p.first);
-    if ((*beliefs)[state].expected_value == std::numeric_limits<double>::infinity()) {
-      //std::cout << "resetting to previous belief\n";
-      (*beliefs)[state].expected_value = p.second;
-    }
-  }
+  // auto const &initial_state = state_registry.lookup_state(initial_id);
+  // if ((*beliefs)[initial_state].expected_value == exp_cache[initial_id]) {
+  //   (*beliefs)[initial_state].shift++;
+  //   (*beliefs)[initial_state].expected_value++;
+  // }
+
+  // auto const &initial_state = state_registry.lookup_state(initial_id);
+  // std::cout << "Learning changed h_hat of current state from " << exp_cache[initial_id] << " to " << (*beliefs)[initial_state].expected_cost() << "\n";
 }
 }

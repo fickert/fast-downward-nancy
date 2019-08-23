@@ -135,6 +135,19 @@ SearchNode SearchSpace::get_node(const GlobalState &state) {
 
 void SearchSpace::trace_path(const GlobalState &goal_state,
                              vector<OperatorID> &path) const {
+  trace_path_rev(goal_state, path);
+  reverse(path.begin(), path.end());
+}
+
+void SearchSpace::trace_path_rev_id(const StateID goal_id,
+                                    vector<OperatorID> &path) const {
+  std::cout << "looking up state " << goal_id.hash() << " from "<< &state_registry << "\n";
+  GlobalState state = state_registry.lookup_state(goal_id);
+  trace_path_rev(state, path);
+}
+
+void SearchSpace::trace_path_rev(const GlobalState &goal_state,
+                                 vector<OperatorID> &path) const {
     GlobalState current_state = goal_state;
     assert(path.empty());
     for (;;) {
@@ -146,7 +159,31 @@ void SearchSpace::trace_path(const GlobalState &goal_state,
         path.push_back(info.creating_operator);
         current_state = state_registry.lookup_state(info.parent_state_id);
     }
-    reverse(path.begin(), path.end());
+}
+
+void SearchSpace::trace_path_rev_id_to(const StateID initial_id,
+                                       const StateID goal_id,
+                                       vector<OperatorID> &path) const
+{
+  GlobalState goal_state = state_registry.lookup_state(goal_id);
+  trace_path_rev_to(initial_id, goal_state, path);
+}
+
+void SearchSpace::trace_path_rev_to(StateID initial_id,
+                                    const GlobalState &goal_state,
+                                    vector<OperatorID> &path) const
+{
+    GlobalState current_state = goal_state;
+    assert(path.empty());
+    while (initial_id != current_state.get_id()) {
+        const SearchNodeInfo &info = search_node_infos[current_state];
+        if (info.creating_operator == OperatorID::no_operator) {
+            assert(info.parent_state_id == StateID::no_state);
+            break;
+        }
+        path.push_back(info.creating_operator);
+        current_state = state_registry.lookup_state(info.parent_state_id);
+    }
 }
 
 void SearchSpace::dump(const TaskProxy &task_proxy) const {

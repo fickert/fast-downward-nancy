@@ -65,6 +65,16 @@ public:
     SearchNode get_node(const GlobalState &state);
     void trace_path(const GlobalState &goal_state,
                     std::vector<OperatorID> &path) const;
+    void trace_path_rev(const GlobalState &goal_state,
+                        std::vector<OperatorID> &path) const;
+    void trace_path_rev_id(const StateID goal_id,
+                           std::vector<OperatorID> &path) const;
+    void trace_path_rev_id_to(const StateID initial_id,
+                              const StateID goal_id,
+                              std::vector<OperatorID> &path) const;
+    void trace_path_rev_to(StateID initial_id,
+                           const GlobalState &goal_state,
+                           std::vector<OperatorID> &path) const;
 
     void dump(const TaskProxy &task_proxy) const;
     void print_statistics() const;
