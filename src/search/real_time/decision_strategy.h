@@ -43,17 +43,21 @@ class NancyDecisionStrategy
   // PerStateInformation<ShiftedDistribution> const *beliefs;
   const TLAs *tlas;
   SearchEngine const &engine; // need this just so I can call get_adjusted_cost
+  StateRegistry const &state_registry;
   // Beliefs const *beliefs;
 
   double target_h_hat;
   double target_f_hat;
   std::vector<OperatorID> target_path;
+  StateID target_state_id;
 
 public:
 	NancyDecisionStrategy(TLAs const *tlas,
-                        SearchEngine const &engine);
+                        SearchEngine const &engine,
+                        StateRegistry const &state_registry,
+                        StateID dummy_id);
 	~NancyDecisionStrategy() = default;
-  OperatorID pick_top_level_action(SearchSpace const &search_space);
+  OperatorID pick_top_level_action(SearchSpace &search_space);
 
 };
 

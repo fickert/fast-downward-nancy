@@ -25,17 +25,30 @@ auto ScalarDecisionStrategy::get_top_level_action(const std::vector<StateID> &fr
 
 
 NancyDecisionStrategy::NancyDecisionStrategy(TLAs const *tlas,
-                                             SearchEngine const &engine)
-  : tlas(tlas), engine(engine)
+                                             SearchEngine const &engine,
+                                             StateRegistry const &state_registry,
+                                             StateID dummy_id)
+  : tlas(tlas), engine(engine), state_registry(state_registry), target_state_id(dummy_id)
 {
   assert(tlas);
 }
 
 // beliefs from frontier are already backed up to tlas during expansion.
 // Now we just have to select the minimum expected among them.
-OperatorID NancyDecisionStrategy::pick_top_level_action(SearchSpace const &search_space)
+OperatorID NancyDecisionStrategy::pick_top_level_action(SearchSpace &search_space)
 {
   //std::cout << "pick_top_level_action()\n";
+
+  // clear path if we expanded the node we had decided to move to.  we
+  // need to look at its successors anyway so we just build a new
+  // path.
+  GlobalState const target_state = state_registry.lookup_state(target_state_id);
+  SearchNode const target_node = search_space.get_node(target_state);
+  if (target_node.is_closed()) {
+    // std::cout << "expanded target_state\n";
+    target_path.clear();
+  }
+
   if (target_path.empty()) {
     target_h_hat = std::numeric_limits<double>::infinity();
     target_f_hat = std::numeric_limits<double>::infinity();
@@ -98,6 +111,7 @@ OperatorID NancyDecisionStrategy::pick_top_level_action(SearchSpace const &searc
     target_path.pop_back();
     target_h_hat = min_h;
     target_f_hat = min_f;
+    target_state_id = tlas->states[min_id].first;
     //std::cout << "new target state " << tlas->states[min_id].first << " with f, h: " << target_f_hat << ", " << target_h_hat << "\n";
     return next_action;
   } else {

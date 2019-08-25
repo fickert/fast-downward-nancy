@@ -99,7 +99,7 @@ RealTimeSearch::RealTimeSearch(const options::Options &opts)
 	case DecisionStrategy::NANCY: {
     auto const tlas = this->lookahead_search->get_tlas();
     assert(tlas);
-    nancy_decision_strategy = std::make_unique<NancyDecisionStrategy>(tlas, *this);
+    nancy_decision_strategy = std::make_unique<NancyDecisionStrategy>(tlas, *this, state_registry, current_state.get_id());
 		decision_strategy = nullptr;
 		break;
 	}
