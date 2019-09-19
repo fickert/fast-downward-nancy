@@ -39,8 +39,10 @@ class AStarSolveAll : public SearchEngine {
 
 	std::unordered_set<StateID> expanded_states;
 	std::unordered_map<StateID, std::pair<int, int>> solved_states;
+	std::unordered_map<StateID, StateID> parent;
 
 	const bool find_early_solutions;
+	const bool collect_parent_h;
 	StateID best_solution_state;
 	int best_solution_cost;
 

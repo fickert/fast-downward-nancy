@@ -36,6 +36,7 @@ AStarSolveAll::AStarSolveAll(const Options &opts)
       hstar_file(opts.get<std::string>("hstar_file")),
       successors_file(opts.get<std::string>("successors_file")),
       find_early_solutions(opts.get<bool>("find_early_solutions")),
+      collect_parent_h(opts.get<bool>("collect_parent_h")),
       best_solution_state(StateID::no_state),
       best_solution_cost(std::numeric_limits<int>::max()),
       computing_initial_solution(true),
@@ -229,8 +230,15 @@ SearchStatus AStarSolveAll::step() {
                 print_checkpoint_line(succ_node.get_g());
                 reward_progress();
             }
+
+            if (collect_parent_h) {
+              parent.insert_or_assign(succ_state.get_id(), s.get_id());
+            }
         } else if (succ_node.get_g() > node.get_g() + get_adjusted_cost(op)) {
             // We found a new cheapest path to an open or closed state.
+            if (collect_parent_h) {
+              parent.insert_or_assign(succ_state.get_id(), s.get_id());
+            }
             if (reopen_closed_nodes) {
                 if (succ_node.is_closed()) {
                     /*
@@ -281,7 +289,15 @@ void AStarSolveAll::dump_hstar_values() const {
 	auto out = std::ofstream(hstar_file);
 	for (const auto &[state_id, h_values] : solved_states) {
 		const auto [h, hstar] = h_values;
-		out << h << " " << hstar << '\n';
+		if (collect_parent_h) {
+			const auto p = parent.find(state_id);
+			assert(p != parent.end());
+			const auto ph = solved_states.find(p->second);
+			assert(ph != solved_states.end());
+			out << h << " " << hstar <<  " " << ph->second.first << '\n';
+		} else {
+			out << h << " " << hstar << '\n';
+		}
 	}
 	out.close();
 	std::cout << "dumped h* values to " << hstar_file << std::endl;
@@ -463,6 +479,7 @@ static shared_ptr<SearchEngine> _parse(options::OptionParser &parser) {
 	parser.add_option<std::string>("successors_file", "file name to dump post-expansion data", "successors_data.txt");
 	parser.add_option<double>("reserved_time", "reserved time to dump data", "0", Bounds("0", ""));
 	parser.add_option<bool>("find_early_solutions", "stop when finding an optimal solution through a node with known h* value", "false");
+	parser.add_option<bool>("collect_parent_h", "also collect and print the parent h for each state", "false");
 
 	SearchEngine::add_pruning_option(parser);
 	SearchEngine::add_options_to_parser(parser);
