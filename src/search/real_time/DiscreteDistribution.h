@@ -1,6 +1,7 @@
 #pragma once
 
 #include "util.h"
+#include "belief_data.h"
 
 #include <cmath>
 #include <vector>
@@ -67,12 +68,14 @@ public:
   DiscreteDistribution(int maxSamples, double g, double d, int bf);
   // Creates a delta spike belief
   DiscreteDistribution(int maxSamples, double deltaSpikeValue);
-  template<class count_type>
-  DiscreteDistribution(int maxSamples, const real_time::hstar_data_entry<count_type> &hstar_data);
+  template<typename CountT>
+  DiscreteDistribution(int maxSamples, const real_time::HStarEntry<CountT> &hstar_data);
   DiscreteDistribution(double g, double h, bool& retSuccess);
   DiscreteDistribution(DiscreteDistribution const &other);
+  DiscreteDistribution(DiscreteDistribution const &other, int shift);
   DiscreteDistribution(DiscreteDistribution const &other, double shift);
   DiscreteDistribution(DiscreteDistribution const *other);
+  DiscreteDistribution(DiscreteDistribution const *other, int shift);
   DiscreteDistribution(DiscreteDistribution const *other, double shift);
 
   void createFromUniform(int maxSamples, double g, double d);
@@ -115,8 +118,11 @@ double variance(ShiftedDistribution const &d);
 std::pair<double, double> variance_and_stddev(DiscreteDistribution const &);
 std::pair<double, double> variance_and_stddev(ShiftedDistribution const &);
 
-template<class count_type>
-DiscreteDistribution::DiscreteDistribution(int maxSamples, const real_time::hstar_data_entry<count_type> &hstar_data)
+template<typename CountT>
+DiscreteDistribution::DiscreteDistribution(
+    int maxSamples,
+    const real_time::HStarEntry<CountT> &hstar_data
+    )
   : maxSamples(maxSamples)
 {
   // we have hstar_data with 10_000 samples.  it would be great to use

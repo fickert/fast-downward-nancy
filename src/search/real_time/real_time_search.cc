@@ -6,6 +6,7 @@
 #include "../task_utils/task_properties.h"
 #include "../utils/system.h"
 #include "util.h"
+#include "belief_data.h"
 #include "DiscreteDistribution.h"
 #include "risk_search.h"
 
@@ -22,10 +23,12 @@ RealTimeSearch::RealTimeSearch(const options::Options &opts)
 	  evaluate_heuristic_when_learning(LookaheadSearchMethod(opts.get_enum("lookahead_search")) == LookaheadSearchMethod::BREADTH_FIRST),
     learning_method(LearningMethod(opts.get_enum("learning")))
 {
+	DataFeatureKind f_kind = static_cast<DataFeatureKind>(opts.get_enum("feature_kind"));
+	DataFeatureKind pf_kind = static_cast<DataFeatureKind>(opts.get_enum("post_feature_kind"));
 	if (opts.contains("hstar_data"))
-		hstar_data = std::make_unique<hstar_data_type<int>>(read_hstar_data<int>(opts.get<std::string>("hstar_data")));
+		hstar_data = std::make_unique<HStarData<int>>(opts.get<std::string>("hstar_data"), f_kind);
 	if (opts.contains("post_expansion_belief_data"))
-		post_expansion_belief_data = std::make_unique<hstar_data_type<long long>>(read_hstar_data<long long>(opts.get<std::string>("post_expansion_belief_data")));
+		post_expansion_belief_data = std::make_unique<HStarData<long long>>(opts.get<std::string>("post_expansion_belief_data"), pf_kind);
 
 	heuristic = opts.get<std::shared_ptr<Evaluator>>("h");
 	base_heuristic = heuristic;
@@ -48,7 +51,7 @@ RealTimeSearch::RealTimeSearch(const options::Options &opts)
 		lookahead_search = std::make_unique<FHatLookaheadSearch>(state_registry, opts.get<int>("lookahead_bound"), heuristic, distance_heuristic, store_exploration_data, expansion_delay.get(), *heuristic_error, this);
 		break;
 	case LookaheadSearchMethod::RISK:
-		lookahead_search = std::make_unique<RiskLookaheadSearch>(state_registry, opts.get<int>("lookahead_bound"), heuristic, base_heuristic, distance_heuristic, store_exploration_data, expansion_delay.get(), heuristic_error.get(), hstar_data.get(), post_expansion_belief_data.get(), this);
+		lookahead_search = std::make_unique<RiskLookaheadSearch>(state_registry, opts.get<int>("lookahead_bound"), heuristic, base_heuristic, distance_heuristic, store_exploration_data, expansion_delay.get(), heuristic_error.get(), hstar_data.get(), post_expansion_belief_data.get(), this, f_kind, pf_kind);
 		break;
 	default:
 		std::cerr << "unknown lookahead search method: " << opts.get_enum("lookahead_search") << std::endl;
@@ -234,6 +237,8 @@ static auto _parse(options::OptionParser &parser) -> std::shared_ptr<SearchEngin
 	parser.add_enum_option("lookahead_search", {"A_STAR", "F_HAT", "BREADTH_FIRST", "RISK"}, "Lookahead search algorithm", "A_STAR");
 	parser.add_enum_option("learning", {"NONE","DIJKSTRA","NANCY"}, "What kind of learning update to perform (DIJKSTRA for heuristic values, NANCY for beliefs)", "NONE");
 	parser.add_enum_option("decision_strategy", {"MINIMIN", "BELLMAN", "NANCY", "CSERNA", "K_BEST"}, "Top-level action selection strategy", "MINIMIN");
+	parser.add_enum_option("feature_kind", {"JUST_H, WITH_PARENT_H"}, "Kind of features to look up the beliefs in the data (the data format has to match)", "JUST_H");
+	parser.add_enum_option("post_feature_kind", {"JUST_H, WITH_PARENT_H"}, "Kind of features to look up the post beliefs in the data (the data format has to match)", "JUST_H");
 	parser.add_option<int>("k", "Value for k-best decision strategy", "3");
 	parser.add_option<int>("expansion_delay_window_size", "Sliding average window size used for the computation of expansion delays (set this to 0 to use the global average)", "0", options::Bounds("0", ""));
 	parser.add_option<std::string>("hstar_data", "file containing h* data", options::OptionParser::NONE);

@@ -47,8 +47,8 @@ class RealTimeSearch : public SearchEngine {
     NANCY,
   };
 
-	std::unique_ptr<hstar_data_type<int>> hstar_data;
-	std::unique_ptr<hstar_data_type<long long>> post_expansion_belief_data;
+	std::unique_ptr<HStarData<int>> hstar_data;
+	std::unique_ptr<HStarData<long long>> post_expansion_belief_data;
 
 	const bool evaluate_heuristic_when_learning;
 

@@ -292,6 +292,11 @@ DiscreteDistribution::DiscreteDistribution(DiscreteDistribution const &other)
   }
 }
 
+DiscreteDistribution::DiscreteDistribution(DiscreteDistribution const &other, int shift)
+  :DiscreteDistribution(other, static_cast<double>(shift))
+{
+}
+
 DiscreteDistribution::DiscreteDistribution(DiscreteDistribution const &other, double shift)
   :maxSamples(other.maxSamples)
 {
@@ -302,6 +307,11 @@ DiscreteDistribution::DiscreteDistribution(DiscreteDistribution const &other, do
 
 DiscreteDistribution::DiscreteDistribution(DiscreteDistribution const *other)
   :DiscreteDistribution(*other)
+{
+}
+
+DiscreteDistribution::DiscreteDistribution(DiscreteDistribution const *other, int shift)
+  : DiscreteDistribution(*other, shift)
 {
 }
 

@@ -46,55 +46,6 @@ bool add_state_owner(std::unordered_map<StateID, std::vector<int> > &state_owner
   }
 }
 
-// This function returns the distribution from the data for a given h
-// value.  This requires taking care of multiple things (since we
-// might have to extrapolate).  First, if there is data for h, its
-// distribution is returned.  Otherwise we find the greatest h_adj
-// lower than h for which have a distribution.  We create a new
-// distribution for h by shifting the distribution of h_adj.  In all
-// cases, all constructed distributions are cached to be available
-// next time we look up the distribution for this h value.
-template<typename T>
-DiscreteDistribution *get_distribution(hstar_data_type<T> const *data, int const h_in, std::vector<DiscreteDistribution*> &raws)
-{
-  DiscreteDistribution *res = nullptr;
-  DiscreteDistribution *raw;
-  int h_adj = h_in;
-
-  while (h_adj >= 0) {
-    // check if we have previously computed the distribution for h_adj
-    raw = raws[h_adj];
-    if (raw != nullptr) {
-      break;
-    }
-
-    // else check if we have data to compute the distribution for h_adj
-    const auto it = data->find(h_adj);
-    if (it != std::end(*data)) {
-      raw = new DiscreteDistribution(MAX_SAMPLES, it->second);
-      raws[h_adj] = raw;
-      break;
-    }
-
-    // else check the next smaller h
-    --h_adj;
-  }
-
-  if (h_in == h_adj) {
-    // no extrapolation necessary
-    res = raw;
-  } else {
-    // create a new extrapolated distribution
-    int const shift = h_in - h_adj;
-    assert(shift >= 0);
-    double const d_shift = static_cast<double>(shift);
-    res = new DiscreteDistribution(raw, d_shift);
-    raws[h_in] = res;
-  }
-
-  return res;
-}
-
 ShiftedDistribution RiskLookaheadSearch::get_belief(EvaluationContext &eval_context)
 {
   // first check if we know this state from previous expansions and
@@ -105,38 +56,22 @@ ShiftedDistribution RiskLookaheadSearch::get_belief(EvaluationContext &eval_cont
     return belief;
   }
 
-  // if not, check if we know which distribution is associated with
-  // the states h-value.  If yes, assign the state's belief to that.
+  // if not, get the distribution associated with the state's features
+  // and assign the state's belief to that.
   int h = eval_context.get_evaluator_value(base_heuristic.get());
-  if (static_cast<size_t>(h) >= raw_beliefs.size()) {
-    raw_beliefs.resize(h+1);
-    raw_post_beliefs.resize(h+1);
-  }
-
-  bool has_data;
-
-  DiscreteDistribution *distribution = raw_beliefs[h];
+  // TODO: add additional features here
+  DataFeature df(h);
+  DiscreteDistribution *distribution = raw_beliefs.get_distribution(df);
   if (!distribution) {
-    // if not, create the distribution for this h-value based on data,
-    // possibly extrapolating it, cache it, and assign the state's
-    // belief to it.
-    has_data = false;
-    if (hstar_data) {
-      distribution = get_distribution(hstar_data, h, raw_beliefs);
-      has_data = nullptr != distribution;
-    }
-    if (!has_data) {
-      // this should only happen if we're not using the data-driven approach
-      ++hstar_gaussian_fallback_count;
-      const auto f = eval_context.get_evaluator_value_or_infinity(f_evaluator.get());
-      assert(f != EvaluationResult::INFTY);
-      const auto f_hat = eval_context.get_evaluator_value_or_infinity(f_hat_evaluator.get());
-      assert(f_hat != EvaluationResult::INFTY);
-      const auto d = eval_context.get_evaluator_value_or_infinity(distance_heuristic.get());
-      assert(d != EvaluationResult::INFTY);
-      distribution = new DiscreteDistribution(MAX_SAMPLES, f, f_hat, d, f_hat - f);
-      raw_beliefs[h] = distribution;
-    }
+    // this should never happen if we're using the data-driven approach
+    const auto f = eval_context.get_evaluator_value_or_infinity(f_evaluator.get());
+    assert(f != EvaluationResult::INFTY);
+    const auto f_hat = eval_context.get_evaluator_value_or_infinity(f_hat_evaluator.get());
+    assert(f_hat != EvaluationResult::INFTY);
+    const auto d = eval_context.get_evaluator_value_or_infinity(distance_heuristic.get());
+    assert(d != EvaluationResult::INFTY);
+    distribution = new DiscreteDistribution(MAX_SAMPLES, f, f_hat, d, f_hat - f);
+    raw_beliefs.remember(df, distribution);
   }
   belief.set(distribution, 0);
   beliefs[state] = belief;
@@ -145,25 +80,19 @@ ShiftedDistribution RiskLookaheadSearch::get_belief(EvaluationContext &eval_cont
   // already.  This way we can be sure that both beliefs are always
   // present.
   ShiftedDistribution post_belief;
-  DiscreteDistribution *post_distribution = raw_post_beliefs[h];
+  DiscreteDistribution *post_distribution = raw_post_beliefs.get_distribution(df);
   if (!post_distribution) {
-    has_data = false;
-    if (post_expansion_belief_data) {
-      post_distribution = get_distribution(post_expansion_belief_data, h, raw_post_beliefs);
-      has_data = nullptr != distribution;
-    }
-    if (!has_data) {
-      // this should only happen if we're not using the data-driven approach
-      ++post_expansion_belief_gaussian_fallback_count;
-      double ds = 1 / expansion_delay->get_avg_expansion_delay();
-      auto eval_context = EvaluationContext(state_registry.lookup_state(state.get_id()), -1, false, nullptr);
-      assert(!eval_context.is_evaluator_value_infinite(distance_heuristic.get()));
-      double dy = eval_context.get_evaluator_value(distance_heuristic.get());
-      double squishFactor = min(1.0, (ds / dy));
-      // needs to be a copy, because these are separate distributions
-      post_distribution = new DiscreteDistribution(distribution);
-      post_distribution->squish(squishFactor);
-    }
+    // this should never happen if we're using the data-driven approach
+    ++post_expansion_belief_gaussian_fallback_count;
+    double ds = 1 / expansion_delay->get_avg_expansion_delay();
+    auto eval_context = EvaluationContext(state_registry.lookup_state(state.get_id()), -1, false, nullptr);
+    assert(!eval_context.is_evaluator_value_infinite(distance_heuristic.get()));
+    double dy = eval_context.get_evaluator_value(distance_heuristic.get());
+    double squishFactor = min(1.0, (ds / dy));
+    // needs to be a copy, because these are separate distributions
+    post_distribution = new DiscreteDistribution(distribution);
+    post_distribution->squish(squishFactor);
+    raw_beliefs.remember(df, distribution);
   }
   post_belief.set(post_distribution, 0);
   post_beliefs[state] = post_belief;
@@ -645,7 +574,12 @@ void RiskLookaheadSearch::print_statistics() const {
 
 RiskLookaheadSearch::RiskLookaheadSearch(StateRegistry &state_registry, int lookahead_bound,
                                          std::shared_ptr<Evaluator> heuristic, std::shared_ptr<Evaluator> base_heuristic, std::shared_ptr<Evaluator> distance,
-                                         bool store_exploration_data, ExpansionDelay *expansion_delay, HeuristicError *heuristic_error, hstar_data_type<int> *hstar_data, hstar_data_type<long long> *post_expansion_belief_data, SearchEngine const *search_engine)
+                                         bool store_exploration_data, ExpansionDelay *expansion_delay, HeuristicError *heuristic_error,
+                                         HStarData<int> *hstar_data,
+                                         HStarData<long long> *post_expansion_belief_data,
+                                         SearchEngine const *search_engine,
+                                         DataFeatureKind f_kind,
+                                         DataFeatureKind pf_kind)
   : LookaheadSearch(state_registry, lookahead_bound, store_exploration_data,
                     expansion_delay, heuristic_error, search_engine),
     f_evaluator(std::make_shared<sum_evaluator::SumEvaluator>(std::vector<std::shared_ptr<Evaluator>>{heuristic, std::make_shared<g_evaluator::GEvaluator>()})),
@@ -655,6 +589,8 @@ RiskLookaheadSearch::RiskLookaheadSearch(StateRegistry &state_registry, int look
     distance_heuristic(distance),
     beliefs(),
     post_beliefs(),
+    raw_beliefs(f_kind, *hstar_data),
+    raw_post_beliefs(pf_kind, *post_expansion_belief_data),
     hstar_data(hstar_data),
     post_expansion_belief_data(post_expansion_belief_data),
     hstar_gaussian_fallback_count(0),
@@ -665,11 +601,7 @@ RiskLookaheadSearch::RiskLookaheadSearch(StateRegistry &state_registry, int look
   tlas.reserve(32);
   applicables.reserve(32);
   state_owners.reserve(lookahead_bound);
-  assert(raw_beliefs.size() == 0 && raw_post_beliefs.size() == 0);
-
-  // this way we always have data for the goal state.
-  raw_beliefs.push_back(new DiscreteDistribution(1, 0.0));
-  raw_post_beliefs.push_back(new DiscreteDistribution(1, 0.0));
+  assert(raw_beliefs.size() == 1 && raw_post_beliefs.size() == 1);
 
   auto *dead_distribution = new DiscreteDistribution(1);
   // hack to make a distribution with one value at infinity
@@ -685,6 +617,7 @@ RiskLookaheadSearch::~RiskLookaheadSearch()
   // for (auto b : raw_post_beliefs) {
   //   delete b;
   // }
+  // delete dead_distribution;
 }
 
 

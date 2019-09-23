@@ -3,6 +3,8 @@
 
 #include "lookhead_search.h"
 #include "DiscreteDistribution.h"
+#include "belief_data.h"
+#include "belief_store.h"
 #include "../evaluator.h"
 #include "../open_list.h"
 #include "../search_engine.h"
@@ -81,17 +83,17 @@ class RiskLookaheadSearch : public LookaheadSearch
 
   TLAs tlas;
 
-  // Since the distribution is always the same for a given h-value, they
-  // are cached in raw_beliefs, same for the post_expansion
-  // distributions.
+  // Since the distribution is always the same for a given feature
+  // value, they are cached in raw_beliefs, same for the
+  // post_expansion distributions.
   Beliefs beliefs;
   Beliefs post_beliefs;
-  std::vector<DiscreteDistribution*> raw_beliefs;
-  std::vector<DiscreteDistribution*> raw_post_beliefs;
+  BeliefStore<int> raw_beliefs;
+  BeliefStore<long long> raw_post_beliefs;
   ShiftedDistribution dead_end_belief;
+  HStarData<int> *hstar_data;
+  HStarData<long long> *post_expansion_belief_data;
 
-  hstar_data_type<int> *hstar_data;
-  hstar_data_type<long long> *post_expansion_belief_data;
   int hstar_gaussian_fallback_count;
   int post_expansion_belief_gaussian_fallback_count;
   int alpha_expansion_count;
@@ -124,9 +126,11 @@ public:
                       bool store_exploration_data,
                       ExpansionDelay *expansion_delay,
                       HeuristicError *heuristic_error,
-                      hstar_data_type<int> *hstar_data,
-                      hstar_data_type<long long> *post_expansion_belief_data,
-                      SearchEngine const *search_engine);
+                      HStarData<int> *hstar_data,
+                      HStarData<long long> *post_expansion_belief_data,
+                      SearchEngine const *search_engine,
+                      DataFeatureKind f_kind,
+                      DataFeatureKind pf_kind);
   ~RiskLookaheadSearch() override;
 
   void initialize(const GlobalState &initial_state) override;
