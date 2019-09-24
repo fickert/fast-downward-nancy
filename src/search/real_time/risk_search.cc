@@ -59,6 +59,10 @@ ShiftedDistribution RiskLookaheadSearch::get_belief(EvaluationContext &eval_cont
   // if not, get the distribution associated with the state's features
   // and assign the state's belief to that.
   int h = eval_context.get_evaluator_value(base_heuristic.get());
+  if (static_cast<size_t>(h) >= raw_beliefs.size()) {
+    raw_beliefs.resize(h+1);
+    raw_post_beliefs.resize(h+1);
+  }
   // TODO: add additional features here
   DataFeature df(h);
   DiscreteDistribution *distribution = raw_beliefs.get_distribution(df);
@@ -92,7 +96,7 @@ ShiftedDistribution RiskLookaheadSearch::get_belief(EvaluationContext &eval_cont
     // needs to be a copy, because these are separate distributions
     post_distribution = new DiscreteDistribution(distribution);
     post_distribution->squish(squishFactor);
-    raw_beliefs.remember(df, distribution);
+    raw_post_beliefs.remember(df, post_distribution);
   }
   post_belief.set(post_distribution, 0);
   post_beliefs[state] = post_belief;
@@ -556,11 +560,11 @@ SearchStatus RiskLookaheadSearch::search()
     }
   }
 
-#ifndef DNDEBUG
-  for (size_t i = 0; i < tlas.size(); ++i) {
-    assert(std::find(frontier.begin(), frontier.end(), tlas.states[i].first) != frontier.end());
-  }
-#endif
+// #ifndef DNDEBUG
+//   for (size_t i = 0; i < tlas.size(); ++i) {
+//     assert(std::find(frontier.begin(), frontier.end(), tlas.states[i].first) != frontier.end());
+//   }
+// #endif
 
   return IN_PROGRESS;
 }
@@ -589,8 +593,8 @@ RiskLookaheadSearch::RiskLookaheadSearch(StateRegistry &state_registry, int look
     distance_heuristic(distance),
     beliefs(),
     post_beliefs(),
-    raw_beliefs(f_kind, *hstar_data),
-    raw_post_beliefs(pf_kind, *post_expansion_belief_data),
+    raw_beliefs(f_kind, hstar_data),
+    raw_post_beliefs(pf_kind, post_expansion_belief_data),
     hstar_data(hstar_data),
     post_expansion_belief_data(post_expansion_belief_data),
     hstar_gaussian_fallback_count(0),
