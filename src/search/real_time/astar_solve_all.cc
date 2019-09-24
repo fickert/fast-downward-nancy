@@ -291,9 +291,11 @@ void AStarSolveAll::dump_hstar_values() const {
 		const auto [h, hstar] = h_values;
 		if (collect_parent_h) {
 			const auto p = parent.find(state_id);
-			assert(p != parent.end());
+			if (p == parent.end())
+				continue;
 			const auto ph = solved_states.find(p->second);
-			assert(ph != solved_states.end());
+			if (ph == solved_states.end())
+				continue;
 			out << h << " " << hstar <<  " " << ph->second.first << '\n';
 		} else {
 			out << h << " " << hstar << '\n';
