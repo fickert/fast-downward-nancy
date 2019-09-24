@@ -616,7 +616,7 @@ std::vector<ProbabilityNode>::const_iterator DiscreteDistribution::end() const
 
 double ShiftedDistribution::expected_cost() const
 {
-  assert(expected_value >= 0);
+  //assert(expected_value >= 0);
   return expected_value;
 }
 
