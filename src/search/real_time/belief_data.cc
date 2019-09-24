@@ -88,10 +88,10 @@ std::ostream &operator<<(std::ostream &out, DataFeature const &x)
 {
   switch(x.kind) {
   case JustH:
-    out << x.h;
+    out << "(0, " << x.h << ")";
     break;
   case WithParentH:
-    out << x.h << ", " << x.ph;
+    out << "(1, " << x.h << ", " << x.ph << ")";
     break;
   }
   return out;
