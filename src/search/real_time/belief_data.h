@@ -72,7 +72,7 @@ template<typename CountT = int>
 struct HStarEntries {
   std::vector<DataFeature> features;
   std::vector<HStarEntry<CountT> > values;
-  bool empty() const { assert(features.size() == values.size()); return features.size(); };
+  bool empty() const { assert(features.size() == values.size()); return features.size() == 0; };
 };
 
 template<typename CountT = int>
