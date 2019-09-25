@@ -7,6 +7,7 @@
 
 #include <memory>
 #include <vector>
+#include <tuple>
 
 class Evaluator;
 class PruningMethod;
@@ -38,8 +39,7 @@ class AStarSolveAll : public SearchEngine {
 	void compute_and_dump_successors_data();
 
 	std::unordered_set<StateID> expanded_states;
-	std::unordered_map<StateID, std::pair<int, int>> solved_states;
-	std::unordered_map<StateID, StateID> parent;
+	std::unordered_map<StateID, std::tuple<int, int, int>> solved_states;
 
 	const bool find_early_solutions;
 	const bool collect_parent_h;

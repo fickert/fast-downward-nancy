@@ -152,7 +152,7 @@ SearchStatus AStarSolveAll::step() {
 	if (!computing_initial_solution && find_early_solutions) {
 		const auto solved_states_it = solved_states.find(s.get_id());
 		if (solved_states_it != std::end(solved_states)) {
-			const auto solution_cost = node.get_g() + solved_states_it->second.second;
+			const auto solution_cost = node.get_g() + std::get<2>(solved_states_it->second);
 			if (best_solution_state == StateID::no_state || solution_cost <= best_solution_cost) {
 				best_solution_cost = solution_cost;
 				best_solution_state = s.get_id();
@@ -231,14 +231,8 @@ SearchStatus AStarSolveAll::step() {
                 reward_progress();
             }
 
-            if (collect_parent_h) {
-              parent.insert_or_assign(succ_state.get_id(), s.get_id());
-            }
         } else if (succ_node.get_g() > node.get_g() + get_adjusted_cost(op)) {
             // We found a new cheapest path to an open or closed state.
-            if (collect_parent_h) {
-              parent.insert_or_assign(succ_state.get_id(), s.get_id());
-            }
             if (reopen_closed_nodes) {
                 if (succ_node.is_closed()) {
                     /*
@@ -288,15 +282,9 @@ SearchStatus AStarSolveAll::step() {
 void AStarSolveAll::dump_hstar_values() const {
 	auto out = std::ofstream(hstar_file);
 	for (const auto &[state_id, h_values] : solved_states) {
-		const auto [h, hstar] = h_values;
+		const auto [h, hstar, ph] = h_values;
 		if (collect_parent_h) {
-			const auto p = parent.find(state_id);
-			if (p == parent.end())
-				continue;
-			const auto ph = solved_states.find(p->second);
-			if (ph == solved_states.end())
-				continue;
-			out << h << " " << hstar <<  " " << ph->second.first << '\n';
+			out << h << " " << hstar <<  " " << ph << '\n';
 		} else {
 			out << h << " " << hstar << '\n';
 		}
@@ -321,7 +309,7 @@ void AStarSolveAll::compute_and_dump_successors_data() {
 	};
 	for (const auto &[state_id, h_values] : solved_states) {
 		auto state = state_registry.lookup_state(state_id);
-		const auto [h, hstar] = h_values;
+		const auto [h, hstar, ph] = h_values;
 		if (task_properties::is_goal_state(task_proxy, state) || hstar == EvaluationResult::INFTY)
 			continue;
 		out << h;
@@ -348,16 +336,27 @@ auto AStarSolveAll::update_hstar_from_state(const SearchNode &node, int hstar) -
 	if (!computing_initial_solution || weight <= 1) {
 		for (;;) {
 			const auto expanded_states_it = expanded_states.find(current_state.get_id());
+			auto current_node = current_search_space->get_node(current_state);
+			const bool has_parent = current_node.get_creating_operator() != OperatorID::no_operator;
+			int h;
+			int ph;
 			if (expanded_states_it != std::end(expanded_states)) {
 				expanded_states.erase(expanded_states_it);
 				auto eval_context = EvaluationContext(current_state);
+				h = eval_context.get_evaluator_value(evaluator.get());
+				if (has_parent) {
+					GlobalState const parent_state = state_registry.lookup_state(current_node.get_parent_state_id());
+					auto p_eval_context = EvaluationContext(parent_state);
+					ph = p_eval_context.get_evaluator_value(evaluator.get());
+				} else {
+					ph = h;
+				}
 				assert(solved_states.find(current_state.get_id()) == std::end(solved_states));
 				assert(eval_context.get_evaluator_value(evaluator.get()) <= hstar);
-				solved_states.emplace(current_state.get_id(), std::make_pair(eval_context.get_evaluator_value(evaluator.get()), hstar));
+				solved_states.emplace(current_state.get_id(), std::make_tuple(h, hstar, ph));
 			}
 
-			auto current_node = current_search_space->get_node(current_state);
-			if (current_node.get_creating_operator() == OperatorID::no_operator)
+			if (!has_parent)
 				break;
 
 			current_state = state_registry.lookup_state(current_node.get_parent_state_id());
