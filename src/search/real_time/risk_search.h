@@ -83,14 +83,17 @@ class RiskLookaheadSearch : public LookaheadSearch
 
   TLAs tlas;
 
-  // Since the distribution is always the same for a given feature
-  // value, they are cached in raw_beliefs, same for the
-  // post_expansion distributions.
+  // beliefs for each state
   Beliefs beliefs;
   Beliefs post_beliefs;
+  // cached distributions for each feature value
   BeliefStore<int> raw_beliefs;
   BeliefStore<long long> raw_post_beliefs;
+  // the kind of feature values used to lookup beliefs
+  DataFeatureKind f_kind;
+  DataFeatureKind pf_kind;
   ShiftedDistribution dead_end_belief;
+  // raw data to make h* distributions
   HStarData<int> *hstar_data;
   HStarData<long long> *post_expansion_belief_data;
 
@@ -114,8 +117,8 @@ protected:
   double risk_analysis(std::size_t const alpha, const vector<ShiftedDistribution> &beliefs) const;
   std::size_t select_tla();
   void backup_beliefs();
-  ShiftedDistribution get_belief(EvaluationContext &);
-  ShiftedDistribution get_post_belief(StateID best_state_id);
+  ShiftedDistribution get_belief(EvaluationContext &context, int ph);
+  ShiftedDistribution get_post_belief(StateID state_id);
 public:
 
   RiskLookaheadSearch(StateRegistry &state_registry,

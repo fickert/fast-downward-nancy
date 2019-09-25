@@ -35,9 +35,14 @@ struct DataFeature
   int h;
   int ph;
   DataFeature();
+  // constructor to use just h
   DataFeature(int h);
+  // constructor to use the parent h too
   DataFeature(int h, int ph);
+  // copy constructor
   DataFeature(DataFeature const&);
+  // full constructor specifying everything
+  DataFeature(DataFeatureKind k, int h, int ph);
   virtual ~DataFeature() = default;
 
   bool operator==(DataFeature const &other) const;

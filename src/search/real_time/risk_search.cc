@@ -46,7 +46,7 @@ bool add_state_owner(std::unordered_map<StateID, std::vector<int> > &state_owner
   }
 }
 
-ShiftedDistribution RiskLookaheadSearch::get_belief(EvaluationContext &eval_context)
+ShiftedDistribution RiskLookaheadSearch::get_belief(EvaluationContext &eval_context, int ph)
 {
   // first check if we know this state from previous expansions and
   // have a belief about it
@@ -63,8 +63,7 @@ ShiftedDistribution RiskLookaheadSearch::get_belief(EvaluationContext &eval_cont
     raw_beliefs.resize(h+1);
     raw_post_beliefs.resize(h+1);
   }
-  // TODO: add additional features here
-  DataFeature df(h);
+  DataFeature df(f_kind, h, ph);
   DiscreteDistribution *distribution = raw_beliefs.get_distribution(df);
   if (!distribution) {
     // this should never happen if we're using the data-driven approach
@@ -84,7 +83,8 @@ ShiftedDistribution RiskLookaheadSearch::get_belief(EvaluationContext &eval_cont
   // already.  This way we can be sure that both beliefs are always
   // present.
   ShiftedDistribution post_belief;
-  DiscreteDistribution *post_distribution = raw_post_beliefs.get_distribution(df);
+  DataFeature post_df(pf_kind, h, ph);
+  DiscreteDistribution *post_distribution = raw_post_beliefs.get_distribution(post_df);
   if (!post_distribution) {
     // this should never happen if we're using the data-driven approach
     ++post_expansion_belief_gaussian_fallback_count;
@@ -96,7 +96,7 @@ ShiftedDistribution RiskLookaheadSearch::get_belief(EvaluationContext &eval_cont
     // needs to be a copy, because these are separate distributions
     post_distribution = new DiscreteDistribution(distribution);
     post_distribution->squish(squishFactor);
-    raw_post_beliefs.remember(df, post_distribution);
+    raw_post_beliefs.remember(post_df, post_distribution);
   }
   post_belief.set(post_distribution, 0);
   post_beliefs[state] = post_belief;
@@ -176,6 +176,8 @@ void RiskLookaheadSearch::initialize(const GlobalState &initial_state)
   auto root_node = search_space->get_node(initial_state);
   auto const cur_state_id = initial_state.get_id();
   tlas.current_state = &initial_state;
+  EvaluationContext root_eval_context = EvaluationContext(initial_state, 0, false, statistics.get());
+  int root_h = root_eval_context.get_evaluator_value_or_infinity(heuristic.get());
 
   std::cout << "looking from " << cur_state_id <<  ", h_hat: " << beliefs[initial_state].expected_cost() << "\n";
 
@@ -208,7 +210,7 @@ void RiskLookaheadSearch::initialize(const GlobalState &initial_state)
     tlas.op_costs.push_back(adj_cost);
 
     // add the belief
-    tlas.beliefs.push_back(get_belief(eval_context));
+    tlas.beliefs.push_back(get_belief(eval_context, root_h));
     tlas.post_beliefs.push_back(get_post_belief(succ_state_id));
 
     // add the node to this tla's open list
@@ -437,7 +439,9 @@ SearchStatus RiskLookaheadSearch::search()
     }
 
     // get the state to expand, discarding states that are not owned
-    StateID state_id = tlas.remove_min(tla_id).second;
+    auto const &top = tlas.remove_min(tla_id);
+    StateID state_id = top.second;
+    int this_h = top.first.h;
     while (1) {
       if (state_owned_by_tla(state_owners, state_id, tla_id))
         break;
@@ -495,7 +499,7 @@ SearchStatus RiskLookaheadSearch::search()
           continue;
         }
         succ_node.open(node, op, adj_cost);
-        auto belief = get_belief(succ_eval_context);
+        auto belief = get_belief(succ_eval_context, this_h);
         tlas.open_lists[tla_id].emplace(NodeEvaluation(belief.expected_cost(),
                                                        succ_g,
                                                        succ_eval_context.get_result(heuristic.get()).get_evaluator_value()),
@@ -509,7 +513,7 @@ SearchStatus RiskLookaheadSearch::search()
           if (succ_node.is_closed())
             statistics->inc_reopened();
           succ_node.reopen(node, op, adj_cost);
-          auto belief = get_belief(succ_eval_context);
+          auto belief = get_belief(succ_eval_context, this_h);
           tlas.open_lists[tla_id].emplace(NodeEvaluation(belief.expected_cost(),
                                                          new_g,
                                                          succ_eval_context.get_result(heuristic.get()).get_evaluator_value()),
@@ -595,6 +599,8 @@ RiskLookaheadSearch::RiskLookaheadSearch(StateRegistry &state_registry, int look
     post_beliefs(),
     raw_beliefs(f_kind, hstar_data),
     raw_post_beliefs(pf_kind, post_expansion_belief_data),
+    f_kind(f_kind),
+    pf_kind(pf_kind),
     hstar_data(hstar_data),
     post_expansion_belief_data(post_expansion_belief_data),
     hstar_gaussian_fallback_count(0),

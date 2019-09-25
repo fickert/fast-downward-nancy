@@ -6,6 +6,7 @@ namespace real_time
 DataFeature::DataFeature(int h) : kind(JustH), h(h) {}
 DataFeature::DataFeature(int h, int ph) : kind(WithParentH), h(h), ph(ph) {}
 DataFeature::DataFeature(DataFeature const &x) : kind(x.kind), h(x.h), ph(x.ph) {}
+DataFeature::DataFeature(DataFeatureKind k, int h, int ph) : kind(k), h(h), ph(ph) {}
 
 DataFeature read_data_feat(std::stringstream &s, DataFeatureKind k)
 {
