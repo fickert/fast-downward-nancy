@@ -67,7 +67,7 @@ public:
     void set_bound(int b) {bound = b;}
     int get_bound() {return bound;}
     int get_adjusted_cost(const OperatorProxy &op) const;
-  OperatorsProxy get_operators() const {return task_proxy.get_operators(); };
+    OperatorsProxy get_operators() const {return task_proxy.get_operators(); };
     PlanManager &get_plan_manager() {return plan_manager;}
 
     /* The following three methods should become functions as they

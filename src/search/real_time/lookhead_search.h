@@ -13,6 +13,7 @@
 
 #include <memory>
 #include <vector>
+#include <unordered_set>
 
 namespace real_time {
 
@@ -44,7 +45,7 @@ protected:
 
 	HeuristicError *heuristic_error;
 
-	void mark_expanded(SearchNode &node);
+	virtual void mark_expanded(SearchNode &node);
 
 	bool check_goal_and_set_plan(const GlobalState &state);
 public:
@@ -71,6 +72,7 @@ public:
 	auto get_plan() const -> const Plan & {return plan;}
 	auto get_statistics() const -> const SearchStatistics & {return *statistics;}
 
+	virtual auto get_expanded_states() -> std::unique_ptr<std::unordered_set<StateID> > { return nullptr; };
 	auto get_search_space() const -> SearchSpace & { return *search_space.get(); }
 	auto get_frontier() const -> const decltype(frontier) & { return frontier; }
 	auto get_predecessors() const -> const decltype(predecessors) & { return predecessors; }

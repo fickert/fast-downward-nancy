@@ -77,6 +77,7 @@ protected:
 public:
 	explicit RealTimeSearch(const options::Options &opts);
 	~RealTimeSearch() override {};
+	auto get_expanded_states() -> std::unique_ptr<std::unordered_set<StateID> > { return std::move(lookahead_search->get_expanded_states()); }
 
 	void print_statistics() const override;
 };

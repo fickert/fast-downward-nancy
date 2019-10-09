@@ -28,7 +28,7 @@ class AStarSolveAll : public SearchEngine {
 	std::shared_ptr<Evaluator> evaluator;
 	const int weight;
     std::vector<Evaluator *> path_dependent_evaluators;
-    std::vector<std::shared_ptr<Evaluator>> preferred_operator_evaluators;
+    std::vector<std::shared_ptr<Evaluator> > preferred_operator_evaluators;
 
     std::shared_ptr<PruningMethod> pruning_method;
 
