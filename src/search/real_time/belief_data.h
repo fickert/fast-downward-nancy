@@ -47,9 +47,7 @@ struct DataFeature
 
   bool operator==(DataFeature const &other) const;
   int operator-(DataFeature const &o) const;
-  bool weak_eq(DataFeature const &other) const;
   size_t hash() const;
-  void dec_h();
 };
 
 std::ostream &operator<<(std::ostream &os, DataFeature const &a);
@@ -129,17 +127,5 @@ struct HStarData {
 };
 
 }
-
-namespace std
-{
-template<> struct hash<real_time::DataFeature>
-{
-  size_t operator()(const real_time::DataFeature &x) const
-  {
-    return x.hash();
-  }
-};
-}
-
 
 #endif

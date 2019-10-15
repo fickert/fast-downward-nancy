@@ -26,14 +26,7 @@ DataFeature read_data_feat(std::stringstream &s, DataFeatureKind k)
 
 DataFeature goal_feature(DataFeatureKind k)
 {
-  switch(k) {
-  case JustH:
-    return DataFeature(0);
-  case WithParentH:
-    return DataFeature(0,1);
-  }
-  assert(false);
-  __builtin_unreachable();
+  return DataFeature(k, 0, 1);
 }
 
 bool DataFeature::operator==(DataFeature const &other) const
@@ -48,28 +41,6 @@ bool DataFeature::operator==(DataFeature const &other) const
   }
   assert(false);
   __builtin_unreachable();
-}
-
-bool DataFeature::weak_eq(DataFeature const &other) const
-{
-  return h == other.h;
-}
-
-size_t DataFeature::hash() const
-{
-  switch (kind) {
-  case real_time::JustH:
-    return h;
-  case real_time::WithParentH:
-    return (h ^ 17) << 16 & ph;
-  }
-  assert(false);
-  __builtin_unreachable();
-}
-
-void DataFeature::dec_h()
-{
-  --h;
 }
 
 int DataFeature::operator-(DataFeature const &o) const
