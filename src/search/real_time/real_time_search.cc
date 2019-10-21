@@ -12,6 +12,19 @@
 
 #include <iostream>
 
+
+#define TRACKRT
+
+#ifdef TRACKRT
+#define BEGINF(X) std::cout << "ENTER: " << X << "\n";
+#define ENDF(X) std::cout << "EXIT: " << X << "\n";
+#define TRACKP(X) std::cout << "RT: " << X << "\n";
+#else
+#define BEGINF(X)
+#define ENDF(X)
+#define TRACKP(X)
+#endif
+
 namespace real_time {
 
 RealTimeSearch::RealTimeSearch(const options::Options &opts)
@@ -23,6 +36,7 @@ RealTimeSearch::RealTimeSearch(const options::Options &opts)
 	  evaluate_heuristic_when_learning(LookaheadSearchMethod(opts.get_enum("lookahead_search")) == LookaheadSearchMethod::BREADTH_FIRST),
     learning_method(LearningMethod(opts.get_enum("learning")))
 {
+  BEGINF(__func__);
 	DataFeatureKind f_kind = static_cast<DataFeatureKind>(opts.get_enum("feature_kind"));
 	DataFeatureKind pf_kind = static_cast<DataFeatureKind>(opts.get_enum("post_feature_kind"));
 	if (opts.contains("hstar_data"))
@@ -112,6 +126,7 @@ RealTimeSearch::RealTimeSearch(const options::Options &opts)
 	}
 
 	heuristic->notify_initial_state(current_state);
+  ENDF(__func__);
 }
 
 void RealTimeSearch::initialize_optional_features(const options::Options &opts) {
@@ -254,3 +269,7 @@ static auto _parse(options::OptionParser &parser) -> std::shared_ptr<SearchEngin
 
 static Plugin<SearchEngine> _plugin("real_time", _parse);
 }
+
+
+#undef BEGINF
+#undef ENDF

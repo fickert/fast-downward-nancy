@@ -15,6 +15,15 @@
 #include <fstream>
 #include <memory>
 
+#define TRACKRTSOLVEALL
+
+#ifdef TRACKRTSOLVEALL
+#define BEGINF(X) std::cout << "ENTER: " << X << "\n";
+#define ENDF(X) std::cout << "EXIT: " << X << "\n";
+#else
+#define BEGINF(X)
+#define ENDF(X)
+#endif
 
 namespace real_time
 {
@@ -37,6 +46,7 @@ RtSolveAll::RtSolveAll(const options::Options &opts)
 
 void RtSolveAll::initialize()
 {
+  BEGINF(__func__);
 	gatherer->search();
 	expanded_states = gatherer->get_expanded_states();
 	assert(gatherer->get_status() == SOLVED);
@@ -47,6 +57,7 @@ void RtSolveAll::initialize()
 	// search, and the expanded states were moved correctly.
 	gatherer = nullptr;
 	assert(expanded_states != nullptr);
+  ENDF(__func__);
 }
 
 void RtSolveAll::dump_hstar_values() const
@@ -63,6 +74,7 @@ void RtSolveAll::dump_succ_values() const
 
 SearchStatus RtSolveAll::update_hstar(SearchNode const &node, int hstar)
 {
+  BEGINF(__func__);
 	auto cur_state = node.get_state();
 	int h, ph;
 
@@ -96,6 +108,7 @@ SearchStatus RtSolveAll::update_hstar(SearchNode const &node, int hstar)
 	if (expanded_states->empty()) {
 		dump_hstar_values();
 		dump_succ_values();
+    ENDF(__func__);
 		return SOLVED;
 	}
 
@@ -108,6 +121,8 @@ SearchStatus RtSolveAll::update_hstar(SearchNode const &node, int hstar)
 	EvaluationContext evc{next_state, 0, true, &statistics};
 	assert(!evc.is_evaluator_value_infinite(evaluator.get()));
 	open_list->insert(evc, next_id);
+
+  ENDF(__func__);
 
 	return IN_PROGRESS;
 }
@@ -174,6 +189,7 @@ void RtSolveAll::eval_node(SearchNode &sn, OperatorProxy const &op, SearchNode c
 
 SearchStatus RtSolveAll::step()
 {
+  BEGINF(__func__);
 	if (timer.is_expired()) {
 		dump_hstar_values();
 		dump_succ_values();
@@ -219,4 +235,45 @@ void RtSolveAll::print_statistics() const
 	std::cout << "TODO: implement statistics print\n";
 }
 
+static shared_ptr<SearchEngine> _parse(options::OptionParser &parser) {
+  BEGINF(__func__);
+	parser.document_synopsis(
+		"RT Data Generation search",
+    "");
+	parser.add_option<shared_ptr<Evaluator>>("eval", "evaluator for h-value");
+	parser.add_option<std::string>("hstar_file", "file name to dump h* values", "hstar_values.txt");
+	parser.add_option<std::string>("successors_file", "file name to dump post-expansion data", "successors_data.txt");
+	parser.add_option<double>("reserved_time", "reserved time to dump data", "0", Bounds("0", ""));
+	parser.add_option<bool>("collect_parent_h", "also collect and print the parent h for each state", "false");
+
+	SearchEngine::add_pruning_option(parser);
+	SearchEngine::add_options_to_parser(parser);
+	Options opts = parser.parse();
+
+	shared_ptr<RtSolveAll> engine;
+	if (!parser.dry_run()) {
+		auto g = make_shared<g_evaluator::GEvaluator>();
+		auto h = opts.get<shared_ptr<Evaluator>>("eval");
+		auto f = make_shared<sum_evaluator::SumEvaluator>(vector<shared_ptr<Evaluator>>({g, h}));
+		Options open_list_options;
+		open_list_options.set("evals", vector<shared_ptr<Evaluator>>{f, h});
+		open_list_options.set("pref_only", false);
+		open_list_options.set("unsafe_pruning", false);
+		opts.set<std::shared_ptr<OpenListFactory>>("open", make_shared<tiebreaking_open_list::TieBreakingOpenListFactory>(open_list_options));
+		opts.set<std::shared_ptr<Evaluator>>("f_eval", f);
+		opts.set("reopen_closed", true);
+		vector<shared_ptr<Evaluator>> preferred_list;
+		opts.set("preferred", preferred_list);
+		engine = make_shared<RtSolveAll>(opts);
+	}
+
+  ENDF(__func__);
+	return engine;
 }
+
+static options::Plugin<SearchEngine> _plugin("rt_solve_all", _parse);
+}
+
+
+#undef BEGINF
+#undef ENDF
