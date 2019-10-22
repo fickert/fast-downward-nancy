@@ -32,7 +32,7 @@ namespace real_time {
 class RtSolveAll : public SearchEngine {
 
 	// SearchEngine solver;
-	std::unique_ptr<RealTimeSearch> gatherer;
+	std::shared_ptr<SearchEngine> gatherer;
 
 	std::unique_ptr<std::unordered_set<StateID> > expanded_states;
 	SearchStatus collect_status;
@@ -61,6 +61,7 @@ class RtSolveAll : public SearchEngine {
 	const double reserved_time;
 	utils::CountdownTimer timer;
 
+	void make_next_open_list();
 
 protected:
 	void initialize() final;

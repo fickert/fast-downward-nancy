@@ -39,7 +39,9 @@ protected:
     TaskProxy task_proxy;
 
     PlanManager plan_manager;
+public:
     StateRegistry state_registry;
+protected:
     const successor_generator::SuccessorGenerator &successor_generator;
     SearchSpace search_space;
     SearchProgress search_progress;
@@ -67,6 +69,7 @@ public:
     void set_bound(int b) {bound = b;}
     int get_bound() {return bound;}
     int get_adjusted_cost(const OperatorProxy &op) const;
+	virtual std::unique_ptr<std::unordered_set<StateID> > get_expanded_states() { assert(0); return nullptr; }
     OperatorsProxy get_operators() const {return task_proxy.get_operators(); };
     PlanManager &get_plan_manager() {return plan_manager;}
 

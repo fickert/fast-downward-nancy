@@ -275,6 +275,15 @@ public:
           num_resizes(0) {
     }
 
+	IntHashSet &operator=(IntHashSet &&ihs) {
+		hasher = std::move(ihs.hasher);
+		equal = std::move(ihs.equal);
+		buckets = std::move(ihs.buckets);
+		num_entries = std::move(ihs.num_entries);
+		num_resizes = std::move(ihs.num_resizes);
+		return *this;
+	}
+
     int size() const {
         return num_entries;
     }

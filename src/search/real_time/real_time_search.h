@@ -28,6 +28,7 @@ class RealTimeSearch : public SearchEngine {
 
 	enum class LookaheadSearchMethod {
 		A_STAR,
+		A_STAR_COLLECT,
 		F_HAT,
 		BREADTH_FIRST,
 		RISK
@@ -41,11 +42,11 @@ class RealTimeSearch : public SearchEngine {
 		K_BEST
 	};
 
-  enum class LearningMethod {
-    NONE,
-    DIJKSTRA,
-    NANCY,
-  };
+	enum class LearningMethod {
+		NONE,
+		DIJKSTRA,
+		NANCY,
+	};
 
 	std::unique_ptr<HStarData<int>> hstar_data;
 	std::unique_ptr<HStarData<long long>> post_expansion_belief_data;
@@ -53,17 +54,17 @@ class RealTimeSearch : public SearchEngine {
 	const bool evaluate_heuristic_when_learning;
 
 	std::unique_ptr<LookaheadSearch> lookahead_search;
-  LearningMethod learning_method;
-  // C++ doesn't let me put the learning method classes into a union
-  // unfortunately, because of non-trivial types
-  std::unique_ptr<DijkstraLearning> dijkstra_learning;
-  std::unique_ptr<NancyLearning> nancy_learning;
-  DecisionStrategy decision_strategy_type;
+	LearningMethod learning_method;
+	// C++ doesn't let me put the learning method classes into a union
+	// unfortunately, because of non-trivial types
+	std::unique_ptr<DijkstraLearning> dijkstra_learning;
+	std::unique_ptr<NancyLearning> nancy_learning;
+	DecisionStrategy decision_strategy_type;
 	std::unique_ptr<real_time::DecisionStrategy> decision_strategy;
 
-  // having a separate pointer makes it much nicer than inheritance in
-  // this case
-  std::unique_ptr<NancyDecisionStrategy> nancy_decision_strategy;
+	// having a separate pointer makes it much nicer than inheritance in
+	// this case
+	std::unique_ptr<NancyDecisionStrategy> nancy_decision_strategy;
 
 	std::shared_ptr<Evaluator> distance_heuristic;
 	std::unique_ptr<ExpansionDelay> expansion_delay;
@@ -77,7 +78,7 @@ protected:
 public:
 	explicit RealTimeSearch(const options::Options &opts);
 	~RealTimeSearch() override {};
-	auto get_expanded_states() -> std::unique_ptr<std::unordered_set<StateID> > { return std::move(lookahead_search->get_expanded_states()); }
+	auto get_expanded_states() -> std::unique_ptr<std::unordered_set<StateID> > override { return std::move(lookahead_search->get_expanded_states()); }
 
 	void print_statistics() const override;
 };

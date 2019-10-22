@@ -8,7 +8,7 @@
 class State;
 class StateRegistry;
 
-using PackedStateBin = int_packer::IntPacker::Bin;
+using PackedStateBin = int_packer::Bin;
 
 // For documentation on classes relevant to storing and working with registered
 // states see the file state_registry.h.

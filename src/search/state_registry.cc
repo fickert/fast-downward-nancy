@@ -7,6 +7,70 @@
 
 using namespace std;
 
+StateRegistry::StateIDSemanticHash::StateIDSemanticHash(
+            const segmented_vector::SegmentedArrayVector<PackedStateBin> *state_data_pool,
+            int state_size)
+            : state_data_pool(state_data_pool),
+              state_size(state_size)
+{
+}
+
+StateRegistry::StateIDSemanticHash::StateIDSemanticHash(const StateIDSemanticHash &sh)
+		    :state_data_pool(sh.state_data_pool),
+		     state_size(sh.state_size)
+{
+}
+
+
+int_hash_set::HashType StateRegistry::StateIDSemanticHash::operator()(int id) const
+ {
+	 const PackedStateBin *data = (*state_data_pool)[id];
+	 utils::HashState hash_state;
+	 for (int i = 0; i < state_size; ++i) {
+		 hash_state.feed(data[i]);
+	 }
+	 return hash_state.get_hash32();
+ }
+
+StateRegistry::StateIDSemanticHash &StateRegistry::StateIDSemanticHash::operator=(StateIDSemanticHash &&sh)
+{
+	std::cout << "moving StateIDSemanticHash\n";
+	state_data_pool = sh.state_data_pool;
+	sh.state_data_pool = nullptr;
+	state_size = std::move(sh.state_size);
+	return *this;
+}
+
+StateRegistry::StateIDSemanticEqual::StateIDSemanticEqual(
+            const segmented_vector::SegmentedArrayVector<PackedStateBin> *state_data_pool,
+            int state_size)
+            : state_data_pool(state_data_pool),
+              state_size(state_size)
+{
+}
+
+StateRegistry::StateIDSemanticEqual::StateIDSemanticEqual(const StateIDSemanticEqual &se)
+	:state_data_pool(se.state_data_pool),
+	 state_size(se.state_size)
+{
+}
+
+bool StateRegistry::StateIDSemanticEqual::operator()(int lhs, int rhs) const
+{
+	const PackedStateBin *lhs_data = (*state_data_pool)[lhs];
+	const PackedStateBin *rhs_data = (*state_data_pool)[rhs];
+	return std::equal(lhs_data, lhs_data + state_size, rhs_data);
+}
+
+StateRegistry::StateIDSemanticEqual &StateRegistry::StateIDSemanticEqual::operator=(StateIDSemanticEqual &&se)
+{
+	std::cout << "moving StateIDSemanticEqual\n";
+	state_data_pool = se.state_data_pool;
+	se.state_data_pool = nullptr;
+	state_size = std::move(se.state_size);
+	return *this;
+}
+
 StateRegistry::StateRegistry(const TaskProxy &task_proxy)
     : task_proxy(task_proxy),
       state_packer(task_properties::g_state_packers[task_proxy]),
@@ -14,14 +78,36 @@ StateRegistry::StateRegistry(const TaskProxy &task_proxy)
       num_variables(task_proxy.get_variables().size()),
       state_data_pool(get_bins_per_state()),
       registered_states(
-          StateIDSemanticHash(state_data_pool, get_bins_per_state()),
-          StateIDSemanticEqual(state_data_pool, get_bins_per_state())),
+          StateIDSemanticHash(&state_data_pool, get_bins_per_state()),
+          StateIDSemanticEqual(&state_data_pool, get_bins_per_state())),
       cached_initial_state(0) {
 }
 
+StateRegistry &StateRegistry::operator=(StateRegistry &&sr)
+{
+	std::cout << "moving task proxy\n";
+	task_proxy = std::move(sr.task_proxy);
+	std::cout << "moving state packer\n";
+	const_cast<int_packer::IntPacker &>(state_packer) = std::move(sr.state_packer);
+	std::cout << "moving/assigning axiom evaluator " << (&axiom_evaluator == &sr.axiom_evaluator) << "\n" ;
+	axiom_evaluator = sr.axiom_evaluator;
+	std::cout << "moving num variables\n";
+	*(const_cast<int*>(&num_variables)) = std::move(sr.num_variables);
+	std::cout << "moving state data pool\n";
+	state_data_pool = std::move(sr.state_data_pool);
+	std::cout << "moving registered states\n";
+	registered_states = std::move(sr.registered_states);
+	std::cout << "moving cached initial state\n";
+	cached_initial_state = std::move(sr.cached_initial_state);
+
+	sr.cached_initial_state = nullptr;
+
+	return *this;
+}
 
 StateRegistry::~StateRegistry() {
-    delete cached_initial_state;
+	if (cached_initial_state != nullptr)
+		delete cached_initial_state;
 }
 
 StateID StateRegistry::insert_id_or_pop_state() {

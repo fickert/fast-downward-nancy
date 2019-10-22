@@ -8,6 +8,7 @@
 #include "util.h"
 #include "belief_data.h"
 #include "DiscreteDistribution.h"
+#include "state_collector.h"
 #include "risk_search.h"
 
 #include <iostream>
@@ -50,11 +51,14 @@ RealTimeSearch::RealTimeSearch(const options::Options &opts)
 		heuristic = std::make_shared<LearningEvaluator>(heuristic);
 	initialize_optional_features(opts);
 
-  bool const store_exploration_data = learning_method != LearningMethod::NONE;
-  //bool const store_exploration_data = true;
+	bool const store_exploration_data = learning_method != LearningMethod::NONE;
+	//bool const store_exploration_data = true;
 
-  std::cout << "initializing lookahead method\n";
+	std::cout << "initializing lookahead method\n";
 	switch (LookaheadSearchMethod(opts.get_enum("lookahead_search"))) {
+	case LookaheadSearchMethod::A_STAR_COLLECT:
+		lookahead_search = std::make_unique<AStarCollect>(state_registry, opts.get<int>("lookahead_bound"), heuristic, store_exploration_data, expansion_delay.get(), heuristic_error.get(), this);
+		break;
 	case LookaheadSearchMethod::A_STAR:
 		lookahead_search = std::make_unique<AStarLookaheadSearch>(state_registry, opts.get<int>("lookahead_bound"), heuristic, store_exploration_data, expansion_delay.get(), heuristic_error.get(), this);
 		break;
@@ -72,51 +76,54 @@ RealTimeSearch::RealTimeSearch(const options::Options &opts)
 		utils::exit_with(utils::ExitCode::SEARCH_INPUT_ERROR);
 	}
 
-  std::cout << "initializing learning method\n";
-  switch (learning_method) {
-  case LearningMethod::NONE:
-    dijkstra_learning = nullptr;
-    break;
-  case LearningMethod::DIJKSTRA:
-    dijkstra_learning = std::make_unique<DijkstraLearning>(std::static_pointer_cast<LearningEvaluator>(heuristic),
-                                                           std::static_pointer_cast<LearningEvaluator>(distance_heuristic),
-                                                           state_registry,
-                                                           this);
-    break;
-  case LearningMethod::NANCY:
-    auto beliefs = lookahead_search->get_beliefs();
-    auto post_beliefs = lookahead_search->get_post_beliefs();
-    nancy_learning = std::make_unique<NancyLearning>(state_registry, this, beliefs, post_beliefs);
-    break;
-  }
+	std::cout << "initializing learning method\n";
+	switch (learning_method) {
+	case LearningMethod::NONE:
+		dijkstra_learning = nullptr;
+		break;
+	case LearningMethod::DIJKSTRA:
+		dijkstra_learning = std::make_unique<DijkstraLearning>(
+			std::static_pointer_cast<LearningEvaluator>(heuristic),
+			std::static_pointer_cast<LearningEvaluator>(distance_heuristic),
+			state_registry,
+			this);
+		break;
+	case LearningMethod::NANCY:
+		auto beliefs = lookahead_search->get_beliefs();
+		auto post_beliefs = lookahead_search->get_post_beliefs();
+		nancy_learning = std::make_unique<NancyLearning>(state_registry, this, beliefs, post_beliefs);
+		break;
+	}
 
-  std::cout << "initializing decision strat\n";
-  decision_strategy_type = DecisionStrategy(opts.get_enum("decision_strategy"));
+	std::cout << "initializing decision strat\n";
+	decision_strategy_type = DecisionStrategy(opts.get_enum("decision_strategy"));
 	switch (decision_strategy_type) {
 	case DecisionStrategy::MINIMIN: {
 		auto f_evaluator = std::make_shared<sum_evaluator::SumEvaluator>(std::vector<std::shared_ptr<Evaluator>>{heuristic, std::make_shared<g_evaluator::GEvaluator>()});
-		decision_strategy = std::make_unique<ScalarDecisionStrategy>(state_registry, [this, f_evaluator](const StateID &state_id, SearchSpace &lookahead_search_space) {
-			const auto state = state_registry.lookup_state(state_id);
-			const auto node = lookahead_search_space.get_node(state);
-			auto eval_context = EvaluationContext(state, node.get_g(), false, nullptr, false);
-			return eval_context.get_evaluator_value_or_infinity(f_evaluator.get());
-		});
+		decision_strategy = std::make_unique<ScalarDecisionStrategy>(state_registry,
+			[this, f_evaluator](const StateID &state_id, SearchSpace &lookahead_search_space) {
+				const auto state = state_registry.lookup_state(state_id);
+				const auto node = lookahead_search_space.get_node(state);
+				auto eval_context = EvaluationContext(state, node.get_g(), false, nullptr, false);
+				return eval_context.get_evaluator_value_or_infinity(f_evaluator.get());
+			});
 		break;
 	}
 	case DecisionStrategy::BELLMAN: {
 		auto f_hat_evaluator = create_f_hat_evaluator(heuristic, distance_heuristic, *heuristic_error);
-		decision_strategy = std::make_unique<ScalarDecisionStrategy>(state_registry, [this, f_hat_evaluator](const StateID &state_id, SearchSpace &lookahead_search_space) {
-			const auto state = state_registry.lookup_state(state_id);
-			const auto node = lookahead_search_space.get_node(state);
-			auto eval_context = EvaluationContext(state, node.get_g(), false, nullptr, false);
-			return eval_context.get_evaluator_value_or_infinity(f_hat_evaluator.get());
-		});
+		decision_strategy = std::make_unique<ScalarDecisionStrategy>(state_registry,
+			[this, f_hat_evaluator](const StateID &state_id, SearchSpace &lookahead_search_space) {
+				const auto state = state_registry.lookup_state(state_id);
+				const auto node = lookahead_search_space.get_node(state);
+				auto eval_context = EvaluationContext(state, node.get_g(), false, nullptr, false);
+				return eval_context.get_evaluator_value_or_infinity(f_hat_evaluator.get());
+			});
 		break;
 	}
 	case DecisionStrategy::NANCY: {
-    auto const tlas = this->lookahead_search->get_tlas();
-    assert(tlas);
-    nancy_decision_strategy = std::make_unique<NancyDecisionStrategy>(tlas, *this, state_registry, current_state.get_id());
+		auto const tlas = this->lookahead_search->get_tlas();
+		assert(tlas);
+		nancy_decision_strategy = std::make_unique<NancyDecisionStrategy>(tlas, *this, state_registry, current_state.get_id());
 		decision_strategy = nullptr;
 		break;
 	}
@@ -126,7 +133,7 @@ RealTimeSearch::RealTimeSearch(const options::Options &opts)
 	}
 
 	heuristic->notify_initial_state(current_state);
-  ENDF(__func__);
+	ENDF(__func__);
 }
 
 void RealTimeSearch::initialize_optional_features(const options::Options &opts) {
@@ -249,7 +256,7 @@ static auto _parse(options::OptionParser &parser) -> std::shared_ptr<SearchEngin
 	parser.add_option<std::shared_ptr<Evaluator>>("h", "heuristic");
 	parser.add_option<std::shared_ptr<Evaluator>>("distance_heuristic", "distance heuristic", options::OptionParser::NONE);
 	parser.add_option<int>("lookahead_bound","Lookahead bound in number of expansions.", "100");
-	parser.add_enum_option("lookahead_search", {"A_STAR", "F_HAT", "BREADTH_FIRST", "RISK"}, "Lookahead search algorithm", "A_STAR");
+	parser.add_enum_option("lookahead_search", {"A_STAR", "A_STAR_COLLECT", "F_HAT", "BREADTH_FIRST", "RISK"}, "Lookahead search algorithm", "A_STAR");
 	parser.add_enum_option("learning", {"NONE","DIJKSTRA","NANCY"}, "What kind of learning update to perform (DIJKSTRA for heuristic values, NANCY for beliefs)", "NONE");
 	parser.add_enum_option("decision_strategy", {"MINIMIN", "BELLMAN", "NANCY", "CSERNA", "K_BEST"}, "Top-level action selection strategy", "MINIMIN");
 	parser.add_enum_option("feature_kind", {"JUST_H", "WITH_PARENT_H"}, "Kind of features to look up the beliefs in the data (the data format has to match)", "JUST_H");

@@ -30,7 +30,7 @@ namespace real_time
 
 RtSolveAll::RtSolveAll(const options::Options &opts)
 	:SearchEngine(opts),
-	 gatherer(std::make_unique<RealTimeSearch>(opts)),
+	 gatherer(opts.get<shared_ptr<SearchEngine> >("lookahead")),
 	 initial_state(state_registry.get_initial_state()),
 	 //search_space(std::make_unique(state_registry)),
 	 f_evaluator(opts.get<shared_ptr<Evaluator> >("f_eval", nullptr)),
@@ -46,18 +46,24 @@ RtSolveAll::RtSolveAll(const options::Options &opts)
 
 void RtSolveAll::initialize()
 {
-  BEGINF(__func__);
+	BEGINF(__func__);
 	gatherer->search();
 	expanded_states = gatherer->get_expanded_states();
+	std::cout << "State Registry sizes: " << state_registry.size() << ", " << gatherer->state_registry.size() << "\n";
+	state_registry = std::move(gatherer->state_registry);
 	assert(gatherer->get_status() == SOLVED);
 	assert(expanded_states != nullptr);
 	assert(expanded_states->size() > 0);
 
-	// TODO: check if this calls the destructor for the real_time
-	// search, and the expanded states were moved correctly.
+	// gatherer is a unique_ptr, setting it to null calls its
+	// destructor.
 	gatherer = nullptr;
 	assert(expanded_states != nullptr);
-  ENDF(__func__);
+	std::cout << "Finished initial search, continuing to solve " << expanded_states->size() << " states\n";
+	assert(expanded_states->size() > 0);
+	make_next_open_list();
+	assert(open_list != nullptr);
+	ENDF(__func__);
 }
 
 void RtSolveAll::dump_hstar_values() const
@@ -72,9 +78,24 @@ void RtSolveAll::dump_succ_values() const
 	assert(false);
 }
 
+void RtSolveAll::make_next_open_list()
+{
+	BEGINF(__func__);
+	auto const next_id = *(expanded_states->begin());
+	auto const next_state = state_registry.lookup_state(next_id);
+	open_list->clear();
+	search_space = std::make_unique<SearchSpace>(state_registry);
+	auto initial_node = search_space->get_node(next_state);
+	initial_node.open_initial();
+	EvaluationContext evc{next_state, 0, true, &statistics};
+	assert(!evc.is_evaluator_value_infinite(evaluator.get()));
+	open_list->insert(evc, next_id);
+	ENDF(__func__);
+}
+
 SearchStatus RtSolveAll::update_hstar(SearchNode const &node, int hstar)
 {
-  BEGINF(__func__);
+	BEGINF(__func__);
 	auto cur_state = node.get_state();
 	int h, ph;
 
@@ -108,27 +129,21 @@ SearchStatus RtSolveAll::update_hstar(SearchNode const &node, int hstar)
 	if (expanded_states->empty()) {
 		dump_hstar_values();
 		dump_succ_values();
-    ENDF(__func__);
+		ENDF(__func__);
 		return SOLVED;
 	}
 
-	auto const next_id = *(expanded_states->begin());
-	auto const next_state = state_registry.lookup_state(next_id);
-	open_list->clear();
-	search_space = std::make_unique<SearchSpace>(state_registry);
-	auto initial_node = search_space->get_node(next_state);
-	initial_node.open_initial();
-	EvaluationContext evc{next_state, 0, true, &statistics};
-	assert(!evc.is_evaluator_value_infinite(evaluator.get()));
-	open_list->insert(evc, next_id);
+	make_next_open_list();
 
-  ENDF(__func__);
+	ENDF(__func__);
 
 	return IN_PROGRESS;
 }
 
 std::tuple<GlobalState, SearchNode, bool> RtSolveAll::fetch_next_node()
 {
+	BEGINF(__func__);
+	assert(open_list != nullptr);
 	while (true) {
 		if (open_list->empty()) {
 			cout << "Completely explored state space -- no solution!" << endl;
@@ -196,6 +211,7 @@ SearchStatus RtSolveAll::step()
 		return TIMEOUT;
 	}
 
+	std::cout << "fetching next node\n";
 	auto next = fetch_next_node();
 	auto const &s = std::get<0>(next);
 	auto &n = std::get<1>(next);
@@ -203,6 +219,7 @@ SearchStatus RtSolveAll::step()
 	if (!b)
 		return FAILED;
 
+	std::cout << "checking for goal state\n";
 	if (task_properties::is_goal_state(task_proxy, s)) {
 		return update_hstar(n, 0);
 	}
@@ -213,6 +230,7 @@ SearchStatus RtSolveAll::step()
 	// no pruning method here
 	// no preferred ops here
 
+	std::cout << "expanding next state\n";
 	for (auto op_id : applicables) {
 		OperatorProxy op = task_proxy.get_operators()[op_id];
 		if ((n.get_real_g() + op.get_cost()) >= bound)
@@ -240,11 +258,13 @@ static shared_ptr<SearchEngine> _parse(options::OptionParser &parser) {
 	parser.document_synopsis(
 		"RT Data Generation search",
     "");
+	parser.add_option<shared_ptr<SearchEngine>>("lookahead", "kind of lookahead search to run (currently only real_time searches are allowed for this");
 	parser.add_option<shared_ptr<Evaluator>>("eval", "evaluator for h-value");
 	parser.add_option<std::string>("hstar_file", "file name to dump h* values", "hstar_values.txt");
 	parser.add_option<std::string>("successors_file", "file name to dump post-expansion data", "successors_data.txt");
 	parser.add_option<double>("reserved_time", "reserved time to dump data", "0", Bounds("0", ""));
 	parser.add_option<bool>("collect_parent_h", "also collect and print the parent h for each state", "false");
+	parser.add_option<bool>("reopen_closed_nodes", "reopen closed nodes when solving", "true");
 
 	SearchEngine::add_pruning_option(parser);
 	SearchEngine::add_options_to_parser(parser);

@@ -104,7 +104,7 @@ public:
 	auto operator=(EagerLookaheadSearch &&) = delete;
 
 	void initialize(const GlobalState &initial_state) override;
-	auto search() -> SearchStatus override;
+	auto search() -> SearchStatus final;
 };
 
 class AStarLookaheadSearch : public EagerLookaheadSearch {

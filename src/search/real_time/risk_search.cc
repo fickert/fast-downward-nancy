@@ -224,6 +224,7 @@ void RiskLookaheadSearch::initialize(const GlobalState &initial_state)
     tlas.states.emplace_back(succ_state_id, tlas.beliefs.back().expected_cost());
 
     // add the context for the tla's state
+    // TODO: check the move here
     tlas.eval_contexts.emplace_back(std::move(eval_context));
 
     if (expansion_delay) {

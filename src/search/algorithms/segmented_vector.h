@@ -174,10 +174,17 @@ class SegmentedArrayVector {
         segments.push_back(new_segment);
     }
 
-    // No implementation to forbid copies and assignment
-    SegmentedArrayVector(const SegmentedArrayVector<Element> &);
-    SegmentedArrayVector &operator=(const SegmentedArrayVector<Element> &);
 public:
+	// FD originally provides no implementation for these to forbid copies and assignment
+	SegmentedArrayVector(const SegmentedArrayVector<Element> &sav)
+		: elements_per_array(sav.elements_per_array),
+		  arrays_per_segment(sav.arrays_per_segment),
+		  elements_per_segment(sav.elements_per_segment),
+		  element_allocator(sav.element_allocator),
+		  segments(sav.segments),
+		  the_size(sav.the_size)
+	{}
+
     SegmentedArrayVector(size_t elements_per_array_)
         : elements_per_array(elements_per_array_),
           arrays_per_segment(
@@ -185,7 +192,6 @@ public:
           elements_per_segment(elements_per_array * arrays_per_segment),
           the_size(0) {
     }
-
 
     SegmentedArrayVector(size_t elements_per_array_, const ElementAllocator &allocator_)
         : element_allocator(allocator_),
@@ -195,6 +201,20 @@ public:
           elements_per_segment(elements_per_array * arrays_per_segment),
           the_size(0) {
     }
+
+	SegmentedArrayVector &operator=(SegmentedArrayVector<Element> &&sav)
+	{
+		*(const_cast<size_t*>(&elements_per_array)) = sav.elements_per_array;
+		*(const_cast<size_t*>(&arrays_per_segment)) = sav.arrays_per_segment;
+		*(const_cast<size_t*>(&elements_per_segment)) = sav.elements_per_segment;
+
+		element_allocator = std::move(sav.element_allocator);
+
+		segments = std::move(sav.segments);
+		the_size = sav.the_size;
+
+		return *this;
+	}
 
     ~SegmentedArrayVector() {
         // TODO Factor out common code with SegmentedVector. In particular

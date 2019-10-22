@@ -109,8 +109,8 @@ struct HStarData {
         utils::exit_with(utils::ExitCode::SEARCH_INPUT_ERROR);
       }
 
-      bin.features.emplace_back(feat);
-      bin.values.emplace_back(valueCount);
+      bin.features.push_back(feat);
+      bin.values.push_back(valueCount);
       auto &samples_for_feat = bin.values.back().hstar_values;
       while (!ss.eof()) {
         ss >> hs;

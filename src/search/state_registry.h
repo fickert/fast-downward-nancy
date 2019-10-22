@@ -108,43 +108,41 @@
     state and each landmark whether it was reached in this state.
 */
 
-class StateRegistry : public subscriber::SubscriberService<StateRegistry> {
-    struct StateIDSemanticHash {
-        const segmented_vector::SegmentedArrayVector<PackedStateBin> &state_data_pool;
-        int state_size;
-        StateIDSemanticHash(
-            const segmented_vector::SegmentedArrayVector<PackedStateBin> &state_data_pool,
-            int state_size)
-            : state_data_pool(state_data_pool),
-              state_size(state_size) {
-        }
+class StateRegistry : public subscriber::SubscriberService<StateRegistry>
+{
+	// Semantic Hash used to have a reference to the
+	// state_data_pool instead of a reference.  I changed it to a
+	// pointer for better move semantics.  Moving a reference
+	// would call the copy assignment.
+	struct StateIDSemanticHash
+	{
+		segmented_vector::SegmentedArrayVector<PackedStateBin> const *state_data_pool;
+		int state_size;
+		StateIDSemanticHash(
+			segmented_vector::SegmentedArrayVector<PackedStateBin> const *state_data_pool,
+			int state_size);
+		StateIDSemanticHash(const StateIDSemanticHash &sh);
 
-        int_hash_set::HashType operator()(int id) const {
-            const PackedStateBin *data = state_data_pool[id];
-            utils::HashState hash_state;
-            for (int i = 0; i < state_size; ++i) {
-                hash_state.feed(data[i]);
-            }
-            return hash_state.get_hash32();
-        }
-    };
+		int_hash_set::HashType operator()(int id) const;
+		StateIDSemanticHash &operator=(StateIDSemanticHash &&sh);
+	};
 
-    struct StateIDSemanticEqual {
-        const segmented_vector::SegmentedArrayVector<PackedStateBin> &state_data_pool;
-        int state_size;
-        StateIDSemanticEqual(
-            const segmented_vector::SegmentedArrayVector<PackedStateBin> &state_data_pool,
-            int state_size)
-            : state_data_pool(state_data_pool),
-              state_size(state_size) {
-        }
+	// Semantic Equal used to have a reference to the
+	// state_data_pool instead of a reference.  I changed it to a
+	// pointer for better move semantics.  Moving a reference
+	// would call the copy assignment.
+	struct StateIDSemanticEqual
+	{
+		segmented_vector::SegmentedArrayVector<PackedStateBin> const *state_data_pool;
+		int state_size;
+		StateIDSemanticEqual(
+			segmented_vector::SegmentedArrayVector<PackedStateBin> const *state_data_pool,
+			int state_size);
+		StateIDSemanticEqual(const StateIDSemanticEqual &se);
 
-        bool operator()(int lhs, int rhs) const {
-            const PackedStateBin *lhs_data = state_data_pool[lhs];
-            const PackedStateBin *rhs_data = state_data_pool[rhs];
-            return std::equal(lhs_data, lhs_data + state_size, rhs_data);
-        }
-    };
+		bool operator()(int lhs, int rhs) const;
+		StateIDSemanticEqual &operator=(StateIDSemanticEqual &&se);
+	};
 
     /*
       Hash set of StateIDs used to detect states that are already registered in
@@ -168,6 +166,8 @@ class StateRegistry : public subscriber::SubscriberService<StateRegistry> {
 public:
     explicit StateRegistry(const TaskProxy &task_proxy);
     ~StateRegistry();
+
+	StateRegistry &operator=(StateRegistry &&sr);
 
     const TaskProxy &get_task_proxy() const {
         return task_proxy;

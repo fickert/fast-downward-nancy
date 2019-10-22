@@ -110,7 +110,7 @@ void print_variable_statistics(const TaskProxy &task_proxy) {
     cout << "Variables: " << variables.size() << endl;
     cout << "FactPairs: " << num_facts << endl;
     cout << "Bytes per state: "
-         << state_packer.get_num_bins() * sizeof(int_packer::IntPacker::Bin)
+         << state_packer.get_num_bins() * sizeof(int_packer::Bin)
          << endl;
 }
 

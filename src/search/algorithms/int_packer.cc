@@ -5,22 +5,8 @@
 using namespace std;
 
 namespace int_packer {
-static const int BITS_PER_BIN = sizeof(IntPacker::Bin) * 8;
 
-static IntPacker::Bin get_bit_mask(int from, int to) {
-    // Return mask with all bits in the range [from, to) set to 1.
-    assert(from >= 0 && to >= from && to <= BITS_PER_BIN);
-    int length = to - from;
-    if (length == BITS_PER_BIN) {
-        // 1U << BITS_PER_BIN has undefined behaviour in C++; e.g.
-        // 1U << 32 == 1 (not 0) on 32-bit Intel platforms. Hence this
-        // special case.
-        assert(from == 0 && to == BITS_PER_BIN);
-        return ~IntPacker::Bin(0);
-    } else {
-        return ((IntPacker::Bin(1) << length) - 1) << from;
-    }
-}
+#define BITS_PER_BIN (sizeof(Bin) * 8)
 
 static int get_bit_size_for_range(int range) {
     int num_bits = 0;
@@ -29,41 +15,48 @@ static int get_bit_size_for_range(int range) {
     return num_bits;
 }
 
-class IntPacker::VariableInfo {
-    int range;
-    int bin_index;
-    int shift;
-    Bin read_mask;
-    Bin clear_mask;
-public:
-    VariableInfo(int range_, int bin_index_, int shift_)
-        : range(range_),
-          bin_index(bin_index_),
-          shift(shift_) {
-        int bit_size = get_bit_size_for_range(range);
-        read_mask = get_bit_mask(shift, shift + bit_size);
-        clear_mask = ~read_mask;
-    }
+static Bin get_bit_mask(int from, int to)
+{
+	// Return mask with all bits in the range [from, to) set to 1.
+	assert(from >= 0 && to >= from && static_cast<size_t>(to) <= BITS_PER_BIN);
+	int length = to - from;
+	if (length == BITS_PER_BIN) {
+		// 1U << BITS_PER_BIN has undefined behaviour in C++; e.g.
+		// 1U << 32 == 1 (not 0) on 32-bit Intel platforms. Hence this
+		// special case.
+		assert(from == 0 && to == BITS_PER_BIN);
+		return ~Bin(0);
+	} else {
+		return ((Bin(1) << length) - 1) << from;
+	}
+}
 
-    VariableInfo()
-        : bin_index(-1), shift(0), read_mask(0), clear_mask(0) {
-        // Default constructor needed for resize() in pack_bins.
-    }
+VariableInfo::VariableInfo(int range_, int bin_index_, int shift_)
+	: range(range_),
+	  bin_index(bin_index_),
+	  shift(shift_) {
+	int bit_size = get_bit_size_for_range(range);
+	read_mask = get_bit_mask(shift, shift + bit_size);
+	clear_mask = ~read_mask;
+}
 
-    ~VariableInfo() {
-    }
+VariableInfo::VariableInfo()
+	: bin_index(-1), shift(0), read_mask(0), clear_mask(0) {
+	// Default constructor needed for resize() in pack_bins.
+}
 
-    int get(const Bin *buffer) const {
-        return (buffer[bin_index] & read_mask) >> shift;
-    }
+VariableInfo::~VariableInfo() {
+}
 
-    void set(Bin *buffer, int value) const {
-        assert(value >= 0 && value < range);
-        Bin &bin = buffer[bin_index];
-        bin = (bin & clear_mask) | (value << shift);
-    }
-};
+int VariableInfo::get(const Bin *buffer) const {
+	return (buffer[bin_index] & read_mask) >> shift;
+}
 
+void VariableInfo::set(Bin *buffer, int value) const {
+	assert(value >= 0 && value < range);
+	Bin &bin = buffer[bin_index];
+	bin = (bin & clear_mask) | (value << shift);
+}
 
 IntPacker::IntPacker(const vector<int> &ranges)
     : num_bins(0) {
@@ -95,7 +88,7 @@ void IntPacker::pack_bins(const vector<int> &ranges) {
     vector<vector<int>> bits_to_vars(BITS_PER_BIN + 1);
     for (int var = num_vars - 1; var >= 0; --var) {
         int bits = get_bit_size_for_range(ranges[var]);
-        assert(bits <= BITS_PER_BIN);
+        assert(static_cast<size_t>(bits) <= BITS_PER_BIN);
         bits_to_vars[bits].push_back(var);
     }
 
