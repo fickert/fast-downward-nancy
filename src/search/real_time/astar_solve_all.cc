@@ -117,6 +117,7 @@ void AStarSolveAll::print_checkpoint_line(int g) const {
 void AStarSolveAll::print_statistics() const {
     statistics.print_detailed_statistics();
     search_space.print_statistics();
+    std::cout << "Number of solved states: " << solved_states.size() << "\n";
     pruning_method->print_statistics();
 }
 

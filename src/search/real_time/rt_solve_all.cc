@@ -242,11 +242,8 @@ void RtSolveAll::eval_node(SearchNode &sn, OperatorProxy const &op, SearchNode c
 
 		sn.open(n, op, adj_cost);
 		open_list->insert(succ_eval_context, sn.get_state_id());
-		if (search_progress.check_progress(succ_eval_context)) {
-			// TODO: these two
-			// print_checkpoint_line(sn.get_g());
-			// reward_progress();
-		}
+		// don't care about checking search progress or
+		// preferred ops here
 	} else if (sn.get_g() > n.get_g() + adj_cost) {
 		if (reopen_closed_nodes) {
 			if (sn.is_closed())
@@ -305,7 +302,8 @@ SearchStatus RtSolveAll::step()
 
 void RtSolveAll::print_statistics() const
 {
-	std::cout << "TODO: implement statistics print\n";
+	statistics.print_detailed_statistics();
+	std::cout << "Number of solved states: " << solved_states.size() << "\n";
 }
 
 static shared_ptr<SearchEngine> _parse(options::OptionParser &parser) {
