@@ -13,11 +13,11 @@
 
 #include <iostream>
 
-// #define TRACKRT
+#define TRACKRT
 
 #ifdef TRACKRT
-#define BEGINF(X) std::cout << "ENTER: " << X << "\n";
-#define ENDF(X) std::cout << "EXIT: " << X << "\n";
+#define BEGINF(X) std::cout << "RT: ENTER: " << X << "\n";
+#define ENDF(X) std::cout << "RT: EXIT: " << X << "\n";
 #define TRACKP(X) std::cout << "RT: " << X << "\n";
 #else
 #define BEGINF(X)
@@ -53,16 +53,6 @@ RealTimeSearch::RealTimeSearch(const options::Options &opts)
 	bool const store_exploration_data = learning_method != LearningMethod::NONE;
 	//bool const store_exploration_data = true;
 
-	std::cout << "initializing lookahead termination condition\n";
-	switch (Bound(opts.get_enum("lookahead_term"))) {
-	case Bound::EXPANSIONS:
-		lc.lb = std::make_unique<ExpansionBound>(statistics, opts.get<int>("lookahead_bound"));
-		break;
-	case Bound::TIME:
-		lc.lb = std::make_unique<TimeBound>(opts.get<double>("time_bound"));
-		break;
-	}
-
 	std::cout << "initializing lookahead method\n";
 	switch (LookaheadSearchMethod(opts.get_enum("lookahead_search"))) {
 	case LookaheadSearchMethod::A_STAR_COLLECT:
@@ -83,6 +73,16 @@ RealTimeSearch::RealTimeSearch(const options::Options &opts)
 	default:
 		std::cerr << "unknown lookahead search method: " << opts.get_enum("lookahead_search") << std::endl;
 		utils::exit_with(utils::ExitCode::SEARCH_INPUT_ERROR);
+	}
+
+	std::cout << "initializing lookahead termination condition\n";
+	switch (Bound(opts.get_enum("rtbound_type"))) {
+	case Bound::EXPANSIONS:
+		lc.lb = std::make_unique<ExpansionBound>(opts.get<int>("lookahead_bound"));
+		break;
+	case Bound::TIME:
+		lc.lb = std::make_unique<TimeBound>(opts.get<int>("time_bound"));
+		break;
 	}
 
 	std::cout << "initializing learning method\n";
@@ -163,6 +163,7 @@ void RealTimeSearch::initialize_optional_features(const options::Options &opts) 
 }
 
 void RealTimeSearch::initialize() {
+	BEGINF(__func__);
 	assert(heuristic);
 	std::cout << "Conducting real-time search" << std::endl;
 
@@ -181,12 +182,15 @@ void RealTimeSearch::initialize() {
 
 	auto node = search_space.get_node(current_state);
 	node.open_initial();
+	ENDF(__func__);
 }
 
 SearchStatus RealTimeSearch::step() {
 	++num_rts_phases;
-	lc.ls->initialize(current_state);
+	lc.initialize(current_state);
+	TRACKP("doing lookahead");
 	const auto status = lc.search();
+	TRACKP("finished lookahead");
 
 	const SearchStatistics &current_stats = lc.ls->get_statistics();
 	statistics.inc_expanded(current_stats.get_expanded());
@@ -214,35 +218,34 @@ SearchStatus RealTimeSearch::step() {
 	if (lc.ls->get_frontier().empty())
 		return FAILED;
 
-  switch (learning_method) {
-  case LearningMethod::NONE:
-    break;
-  case LearningMethod::DIJKSTRA:
-    dijkstra_learning->apply_updates(lc.ls->get_predecessors(), lc.ls->get_frontier(), lc.ls->get_closed(), evaluate_heuristic_when_learning);
-    break;
-  case LearningMethod::NANCY:
-    nancy_learning->apply_updates(lc.ls->get_predecessors(), lc.ls->get_frontier(), lc.ls->get_closed(), current_state);
-    break;
-  }
+	TRACKP("learning/backup");
+	switch (learning_method) {
+	case LearningMethod::NONE:
+		break;
+	case LearningMethod::DIJKSTRA:
+		dijkstra_learning->apply_updates(lc.ls->get_predecessors(), lc.ls->get_frontier(), lc.ls->get_closed(), evaluate_heuristic_when_learning);
+		break;
+	case LearningMethod::NANCY:
+		nancy_learning->apply_updates(lc.ls->get_predecessors(), lc.ls->get_frontier(), lc.ls->get_closed(), current_state);
+		break;
+	}
 
-  // TODO: do it properly
-  // LookaheadControl lc{nullptr, ExpansionBound(statistics, 100)};
-
-  OperatorID best_top_level_action(0);
-  switch (decision_strategy_type) {
-  case DecisionStrategy::NANCY:
-    assert(nancy_decision_strategy);
-    best_top_level_action = nancy_decision_strategy->pick_top_level_action(lc.ls->get_search_space());
-    break;
-  default:
-    best_top_level_action = decision_strategy->get_top_level_action(lc.ls->get_frontier(), lc.ls->get_search_space());
-    break;
-  }
+	TRACKP("action selection");
+	OperatorID best_top_level_action(0);
+	switch (decision_strategy_type) {
+	case DecisionStrategy::NANCY:
+		assert(nancy_decision_strategy);
+		best_top_level_action = nancy_decision_strategy->pick_top_level_action(lc.ls->get_search_space());
+		break;
+	default:
+		best_top_level_action = decision_strategy->get_top_level_action(lc.ls->get_frontier(), lc.ls->get_search_space());
+		break;
+	}
 	//const auto best_top_level_action = decision_strategy->get_top_level_action(lc.ls->get_frontier(), lc.ls->get_search_space());
 	const auto parent_node = search_space.get_node(current_state);
 	const auto op = task_proxy.get_operators()[best_top_level_action];
 	solution_cost += get_adjusted_cost(op);
-  // std::cout << "executing action " << op.get_name() << " with cost " << get_adjusted_cost(op) << "\n";
+	// std::cout << "executing action " << op.get_name() << " with cost " << get_adjusted_cost(op) << "\n";
 	current_state = state_registry.get_successor_state(current_state, op);
 	auto next_node = search_space.get_node(current_state);
 	if (next_node.is_new())
@@ -269,14 +272,14 @@ static auto _parse(options::OptionParser &parser) -> std::shared_ptr<SearchEngin
 	parser.add_option<std::shared_ptr<Evaluator>>("distance_heuristic", "distance heuristic", options::OptionParser::NONE);
 	parser.add_option<int>("lookahead_bound","Lookahead bound in number of expansions.", "100");
 	// TODO: check if the default value here makes any sense.
-	parser.add_option<double>("time_bound","Lookahead bound in milli seconds.", "1000");
+	parser.add_option<int>("time_bound","Lookahead bound in milli seconds.", "200");
+	parser.add_enum_option("rtbound_type", {"EXPANSIONS", "TIME"}, "Type of bound the algorithm is running under", "EXPANSIONS");
 	parser.add_enum_option("lookahead_search", {"A_STAR", "A_STAR_COLLECT", "F_HAT", "BREADTH_FIRST", "RISK"}, "Lookahead search algorithm", "A_STAR");
-	parser.add_enum_option("lookahead_term", {"EXPANSIONS", "TIME"}, "Type of bound the algorithm is running under", "EXPANSIONS");
 	parser.add_enum_option("learning", {"NONE","DIJKSTRA","NANCY"}, "What kind of learning update to perform (DIJKSTRA for heuristic values, NANCY for beliefs)", "NONE");
 	parser.add_enum_option("decision_strategy", {"MINIMIN", "BELLMAN", "NANCY", "CSERNA", "K_BEST"}, "Top-level action selection strategy", "MINIMIN");
 	parser.add_enum_option("feature_kind", {"JUST_H", "WITH_PARENT_H"}, "Kind of features to look up the beliefs in the data (the data format has to match)", "JUST_H");
 	parser.add_enum_option("post_feature_kind", {"JUST_H", "WITH_PARENT_H"}, "Kind of features to look up the post beliefs in the data (the data format has to match)", "JUST_H");
-	parser.add_option<int>("k", "Value for k-best decision strategy", "3");
+	// parser.add_option<int>("k", "Value for k-best decision strategy", "3");
 	parser.add_option<int>("expansion_delay_window_size", "Sliding average window size used for the computation of expansion delays (set this to 0 to use the global average)", "0", options::Bounds("0", ""));
 	parser.add_option<std::string>("hstar_data", "file containing h* data", options::OptionParser::NONE);
 	parser.add_option<std::string>("post_expansion_belief_data", "file containing post-expansion belief data", options::OptionParser::NONE);

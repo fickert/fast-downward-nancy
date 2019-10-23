@@ -72,6 +72,8 @@ public:
 
 	auto found_solution() const -> bool {return solution_found;}
 	auto get_plan() const -> const Plan & {return plan;}
+	// Note: Were taking a const reference to an object inside a
+	// unique ptr here.  This is a little ugly.
 	auto get_statistics() const -> const SearchStatistics & {return *statistics;}
 
 	virtual auto get_expanded_states() -> std::unique_ptr<std::unordered_set<StateID> > { return nullptr; };

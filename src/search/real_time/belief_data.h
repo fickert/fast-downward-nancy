@@ -119,6 +119,8 @@ struct HStarData {
       }
     }
     f.close();
+
+    assert(data.size() > 0);
   }
 
   size_t size() const { return data.size(); }

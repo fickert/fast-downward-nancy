@@ -7,6 +7,19 @@
 #include "../options/plugin.h"
 #include "../task_utils/task_properties.h"
 
+// #define TRACKRISK
+
+#ifdef TRACKRISK
+#define BEGINF(X) std::cout << "RISK: ENTER: " << X << "\n";
+#define ENDF(X) std::cout << "RISK: EXIT: " << X << "\n";
+#define TRACKP(X) std::cout << "RISK: " << X << "\n";
+#else
+#define BEGINF(X)
+#define ENDF(X)
+#define TRACKP(X)
+#endif
+
+
 namespace real_time
 {
 
@@ -164,106 +177,111 @@ TLAs::QueueEntry TLAs::remove_min(size_t tla_id)
 
 void RiskLookaheadSearch::initialize(const GlobalState &initial_state)
 {
-  LookaheadSearch::initialize(initial_state);
+	BEGINF(__func__);
+	LookaheadSearch::initialize(initial_state);
 
-  // generate tlas
-  tlas.clear();
-  state_owners.clear();
-  if (heuristic_error)
-    heuristic_error->set_expanding_state(initial_state);
-  auto ops = std::vector<OperatorID>();
-  successor_generator.generate_applicable_ops(initial_state, ops);
-  auto root_node = search_space->get_node(initial_state);
-  auto const cur_state_id = initial_state.get_id();
-  tlas.current_state = &initial_state;
-  EvaluationContext root_eval_context = EvaluationContext(initial_state, 0, false, statistics.get());
-  int root_h = root_eval_context.get_evaluator_value_or_infinity(heuristic.get());
+	// generate tlas
+	tlas.clear();
+	state_owners.clear();
+	if (heuristic_error)
+		heuristic_error->set_expanding_state(initial_state);
+	applicables.clear();
+	successor_generator.generate_applicable_ops(initial_state, applicables);
+	auto root_node = search_space->get_node(initial_state);
+	auto const cur_state_id = initial_state.get_id();
+	tlas.current_state = &initial_state;
+	EvaluationContext root_eval_context = EvaluationContext(initial_state, 0, false, statistics.get());
+	int root_h = root_eval_context.get_evaluator_value_or_infinity(heuristic.get());
 
-  std::cout << "looking from " << cur_state_id <<  ", h_hat: " << beliefs[initial_state].expected_cost() << "\n";
+	std::cout << "looking from " << cur_state_id <<  ", h_hat: " << beliefs[initial_state].expected_cost() << "\n";
 
-  for (auto op_id : ops) {
-    auto const op = task_proxy.get_operators()[op_id];
-    auto const succ_state = state_registry.get_successor_state(initial_state, op);
-    auto const succ_state_id = succ_state.get_id();
-    auto succ_node = search_space->get_node(succ_state);
-    auto const adj_cost = search_engine->get_adjusted_cost(op);
-    auto const succ_g = adj_cost;
-    if (succ_node.is_new()) {
-      succ_node.open(root_node, op, succ_g);
-    } else if (!succ_node.is_dead_end() && succ_g < succ_node.get_g()) {
-      succ_node.reopen(root_node, op, succ_g);
-    } else {
-      continue;
-    }
+	for (auto op_id : applicables) {
+		auto const op = task_proxy.get_operators()[op_id];
+		auto const succ_state = state_registry.get_successor_state(initial_state, op);
+		auto const succ_state_id = succ_state.get_id();
+		auto succ_node = search_space->get_node(succ_state);
+		auto const adj_cost = search_engine->get_adjusted_cost(op);
+		auto const succ_g = adj_cost;
+		if (succ_node.is_new()) {
+			succ_node.open(root_node, op, succ_g);
+		} else if (!succ_node.is_dead_end() && succ_g < succ_node.get_g()) {
+			succ_node.reopen(root_node, op, succ_g);
+		} else {
+			continue;
+		}
 
-    if (store_exploration_data)
-      predecessors[succ_state_id].emplace_back(cur_state_id, op);
+		if (store_exploration_data)
+			predecessors[succ_state_id].emplace_back(cur_state_id, op);
 
-    auto eval_context = EvaluationContext(succ_state, succ_g, false, statistics.get());
-    if (eval_context.is_evaluator_value_infinite(heuristic.get()) || eval_context.is_evaluator_value_infinite(distance_heuristic.get())) {
-      succ_node.mark_as_dead_end();
-      statistics->inc_dead_ends();
-      continue;
-    }
+		auto eval_context = EvaluationContext(succ_state, succ_g, false, statistics.get());
+		if (eval_context.is_evaluator_value_infinite(heuristic.get()) || eval_context.is_evaluator_value_infinite(distance_heuristic.get())) {
+			succ_node.mark_as_dead_end();
+			statistics->inc_dead_ends();
+			continue;
+		}
 
-    tlas.ops.push_back(op_id);
-    tlas.op_costs.push_back(adj_cost);
+		tlas.ops.push_back(op_id);
+		tlas.op_costs.push_back(adj_cost);
 
-    // add the belief
-    tlas.beliefs.push_back(get_belief(eval_context, root_h));
-    tlas.post_beliefs.push_back(get_post_belief(succ_state_id));
+		// add the belief
+		tlas.beliefs.push_back(get_belief(eval_context, root_h));
+		tlas.post_beliefs.push_back(get_post_belief(succ_state_id));
 
-    // add the node to this tla's open list
-    tlas.open_lists.emplace_back();
-    tlas.open_lists.back().emplace(NodeEvaluation(tlas.beliefs.back().expected_cost(),
-                                                  succ_g,
-                                                  eval_context.get_result(heuristic.get()).get_evaluator_value()),
-                                   succ_state_id);
+		// add the node to this tla's open list
+		tlas.open_lists.emplace_back();
+		tlas.open_lists.back().emplace(NodeEvaluation(tlas.beliefs.back().expected_cost(),
+							      succ_g,
+							      eval_context.get_result(heuristic.get()).get_evaluator_value()),
+					       succ_state_id);
 
-    // add the tla state
-    tlas.states.emplace_back(succ_state_id, tlas.beliefs.back().expected_cost());
+		// add the tla state
+		tlas.states.emplace_back(succ_state_id, tlas.beliefs.back().expected_cost());
 
-    // add the context for the tla's state
-    // TODO: check the move here
-    tlas.eval_contexts.emplace_back(std::move(eval_context));
+		// add the context for the tla's state
+		// TODO: check the move here
+		tlas.eval_contexts.emplace_back(std::move(eval_context));
 
-    if (expansion_delay) {
-      open_list_insertion_time[succ_state_id] = 0;
-    }
-    // make the tla own the state of the top level node (I assume
-    // here, that the state of all top level nodes are distinct)
-    assert(state_owners[succ_state_id].empty());
-    make_state_owner(state_owners, succ_state_id, static_cast<int>(tlas.ops.size()) - 1);
+		if (expansion_delay) {
+			open_list_insertion_time[succ_state_id] = 0;
+		}
+		// make the tla own the state of the top level node (I assume
+		// here, that the state of all top level nodes are distinct)
+		assert(state_owners[succ_state_id].empty());
+		make_state_owner(state_owners, succ_state_id, static_cast<int>(tlas.ops.size()) - 1);
 
-    if (heuristic_error)
-      heuristic_error->add_successor(succ_node, adj_cost);
-  }
+		if (heuristic_error)
+			heuristic_error->add_successor(succ_node, adj_cost);
+	}
+	TRACKP("expanded initial state");
 
-  mark_expanded(root_node);
-  statistics->inc_generated(tlas.size());
+	mark_expanded(root_node);
+	statistics->inc_generated(tlas.size());
 
-  if (heuristic_error)
-    heuristic_error->update_error();
+	TRACKP("updating heuristic error");
+	if (heuristic_error)
+		heuristic_error->update_error();
 
 
 #ifndef DNDEBUG
-  for (size_t i = 0; i < tlas.size(); ++i) {
-    assert(tlas.open_lists[i].size() == 1);
+	for (size_t i = 0; i < tlas.size(); ++i) {
+		assert(tlas.open_lists[i].size() == 1);
 
-    if (!(tlas.post_beliefs[i].expected_cost() -
-          (get_post_belief(tlas.min(i).second).expected_cost() + tlas.min(i).first.g - tlas.op_costs[i])
-          < 0.01)) {
-      std::cout << i << ", "
-                << (void*)tlas.post_beliefs[i].distribution << ", "
-                << tlas.post_beliefs[i].expected_cost() << ", "
-                << (void*)get_post_belief(tlas.min(i).second).distribution << ", "
-                << get_post_belief(tlas.min(i).second).expected_cost() << ", "
-                << tlas.min(i).first.g << ", "
-                << tlas.op_costs[i] << "\n";
-      assert(false);
-    }
-  }
+		if (!(tlas.post_beliefs[i].expected_cost() -
+		      (get_post_belief(tlas.min(i).second).expected_cost() + tlas.min(i).first.g - tlas.op_costs[i])
+		      < 0.01)) {
+			std::cout << i << ", "
+				  << (void*)tlas.post_beliefs[i].distribution << ", "
+				  << tlas.post_beliefs[i].expected_cost() << ", "
+				  << (void*)get_post_belief(tlas.min(i).second).distribution << ", "
+				  << get_post_belief(tlas.min(i).second).expected_cost() << ", "
+				  << tlas.min(i).first.g << ", "
+				  << tlas.op_costs[i] << "\n";
+			assert(false);
+		}
+	}
 #endif
+
+	ENDF(__func__);
 }
 
 double RiskLookaheadSearch::risk_analysis(size_t const alpha, const vector<ShiftedDistribution> &est_beliefs) const
@@ -296,6 +314,7 @@ double RiskLookaheadSearch::risk_analysis(size_t const alpha, const vector<Shift
 // select the tla with the minimal expected risk
 size_t RiskLookaheadSearch::select_tla()
 {
+	BEGINF(__func__);
   size_t res = 0;
   double min_risk = numeric_limits<double>::infinity();
 
@@ -370,6 +389,8 @@ size_t RiskLookaheadSearch::select_tla()
   else
     ++beta_expansion_count;
 
+  ENDF(__func__);
+
   return res;
 }
 
@@ -423,6 +444,7 @@ void RiskLookaheadSearch::backup_beliefs()
 
 SearchStatus RiskLookaheadSearch::step()
 {
+	BEGINF(__func__);
 	assert(statistics);
 
 	if (tlas.size() == 0u) {
@@ -620,3 +642,6 @@ RiskLookaheadSearch::~RiskLookaheadSearch()
 
 
 }
+
+#undef BEGINF
+#undef ENDF
