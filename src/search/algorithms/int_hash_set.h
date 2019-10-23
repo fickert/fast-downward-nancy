@@ -288,6 +288,16 @@ public:
         return num_entries;
     }
 
+	Hasher &get_hasher()
+	{
+		return hasher;
+	}
+
+	Equal &get_equal()
+	{
+		return equal;
+	}
+
     /*
       Insert a key into the hash set.
 

@@ -10,6 +10,7 @@
 #include <vector>
 #include <tuple>
 #include <unordered_set>
+#include <fstream>
 
 class Evaluator;
 class PruningMethod;
@@ -47,7 +48,8 @@ class RtSolveAll : public SearchEngine {
 	void dump_hstar_values() const;
 
 	const std::string successors_file;
-	void dump_succ_values() const;
+	void dump_succ_values();
+	void dump_succ_value(std::ostream &out, GlobalState const &state, int h);
 
 	std::tuple<GlobalState, SearchNode, bool> fetch_next_node();
 	void eval_node(SearchNode &sn, OperatorProxy const &op, SearchNode const &n);
@@ -61,7 +63,7 @@ class RtSolveAll : public SearchEngine {
 	const double reserved_time;
 	utils::CountdownTimer timer;
 
-	void make_next_open_list();
+	void init_next_open_list();
 
 protected:
 	void initialize() final;

@@ -5,6 +5,17 @@
 
 #include "task_utils/task_properties.h"
 
+// #define TRACKSTATEREG
+
+#ifdef TRACKSTATEREG
+#define BEGINF(X) std::cout << "ENTER: " << X << "\n";
+#define ENDF(X) std::cout << "EXIT: " << X << "\n";
+#else
+#define BEGINF(X)
+#define ENDF(X)
+#endif
+
+
 using namespace std;
 
 StateRegistry::StateIDSemanticHash::StateIDSemanticHash(
@@ -34,7 +45,6 @@ int_hash_set::HashType StateRegistry::StateIDSemanticHash::operator()(int id) co
 
 StateRegistry::StateIDSemanticHash &StateRegistry::StateIDSemanticHash::operator=(StateIDSemanticHash &&sh)
 {
-	std::cout << "moving StateIDSemanticHash\n";
 	state_data_pool = sh.state_data_pool;
 	sh.state_data_pool = nullptr;
 	state_size = std::move(sh.state_size);
@@ -64,7 +74,6 @@ bool StateRegistry::StateIDSemanticEqual::operator()(int lhs, int rhs) const
 
 StateRegistry::StateIDSemanticEqual &StateRegistry::StateIDSemanticEqual::operator=(StateIDSemanticEqual &&se)
 {
-	std::cout << "moving StateIDSemanticEqual\n";
 	state_data_pool = se.state_data_pool;
 	se.state_data_pool = nullptr;
 	state_size = std::move(se.state_size);
@@ -85,23 +94,26 @@ StateRegistry::StateRegistry(const TaskProxy &task_proxy)
 
 StateRegistry &StateRegistry::operator=(StateRegistry &&sr)
 {
-	std::cout << "moving task proxy\n";
+	BEGINF(__func__);
+	assert(sr.registered_states.get_hasher().state_data_pool == &sr.state_data_pool);
+	assert(sr.registered_states.get_equal().state_data_pool == &sr.state_data_pool);
+
 	task_proxy = std::move(sr.task_proxy);
-	std::cout << "moving state packer\n";
 	const_cast<int_packer::IntPacker &>(state_packer) = std::move(sr.state_packer);
-	std::cout << "moving/assigning axiom evaluator " << (&axiom_evaluator == &sr.axiom_evaluator) << "\n" ;
 	axiom_evaluator = sr.axiom_evaluator;
-	std::cout << "moving num variables\n";
 	*(const_cast<int*>(&num_variables)) = std::move(sr.num_variables);
-	std::cout << "moving state data pool\n";
 	state_data_pool = std::move(sr.state_data_pool);
-	std::cout << "moving registered states\n";
 	registered_states = std::move(sr.registered_states);
-	std::cout << "moving cached initial state\n";
+	// 'hasher' and 'equal' both have a pointer to the
+	// state_data_pool in the registry itself, which has to be
+	// updated seperately here.
+	registered_states.get_hasher().state_data_pool = &state_data_pool;
+	registered_states.get_equal().state_data_pool = &state_data_pool;
 	cached_initial_state = std::move(sr.cached_initial_state);
 
 	sr.cached_initial_state = nullptr;
 
+	ENDF(__func__);
 	return *this;
 }
 
@@ -180,3 +192,6 @@ void StateRegistry::print_statistics() const {
     cout << "Number of registered states: " << size() << endl;
     registered_states.print_statistics();
 }
+
+#undef BEGINF
+#undef ENDF

@@ -174,16 +174,11 @@ class SegmentedArrayVector {
         segments.push_back(new_segment);
     }
 
+	// No implementation for these to forbid copies and assignment.
+	// move assignment was added below though.
+	SegmentedArrayVector(const SegmentedArrayVector<Element> &sav);
 public:
-	// FD originally provides no implementation for these to forbid copies and assignment
-	SegmentedArrayVector(const SegmentedArrayVector<Element> &sav)
-		: elements_per_array(sav.elements_per_array),
-		  arrays_per_segment(sav.arrays_per_segment),
-		  elements_per_segment(sav.elements_per_segment),
-		  element_allocator(sav.element_allocator),
-		  segments(sav.segments),
-		  the_size(sav.the_size)
-	{}
+
 
     SegmentedArrayVector(size_t elements_per_array_)
         : elements_per_array(elements_per_array_),
@@ -212,6 +207,7 @@ public:
 
 		segments = std::move(sav.segments);
 		the_size = sav.the_size;
+		sav.the_size = 0;
 
 		return *this;
 	}
@@ -219,7 +215,7 @@ public:
     ~SegmentedArrayVector() {
         // TODO Factor out common code with SegmentedVector. In particular
         //      we could destroy the_size * elements_per_array elements here
-        //      wihtout looping over the arrays first.
+        //      without looping over the arrays first.
         for (size_t i = 0; i < the_size; ++i) {
             for (size_t offset = 0; offset < elements_per_array; ++offset) {
                 element_allocator.destroy(operator[](i) + offset);

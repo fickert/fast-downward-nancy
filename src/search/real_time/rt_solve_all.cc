@@ -12,10 +12,9 @@
 #include "../task_utils/task_properties.h"
 
 #include <cassert>
-#include <fstream>
 #include <memory>
 
-#define TRACKRTSOLVEALL
+// #define TRACKRTSOLVEALL
 
 #ifdef TRACKRTSOLVEALL
 #define BEGINF(X) std::cout << "ENTER: " << X << "\n";
@@ -49,9 +48,10 @@ void RtSolveAll::initialize()
 	BEGINF(__func__);
 	gatherer->search();
 	expanded_states = gatherer->get_expanded_states();
-	std::cout << "State Registry sizes: " << state_registry.size() << ", " << gatherer->state_registry.size() << "\n";
 	state_registry = std::move(gatherer->state_registry);
 	assert(gatherer->get_status() == SOLVED);
+	set_plan(gatherer->get_plan());
+
 	assert(expanded_states != nullptr);
 	assert(expanded_states->size() > 0);
 
@@ -61,26 +61,84 @@ void RtSolveAll::initialize()
 	assert(expanded_states != nullptr);
 	std::cout << "Finished initial search, continuing to solve " << expanded_states->size() << " states\n";
 	assert(expanded_states->size() > 0);
-	make_next_open_list();
-	assert(open_list != nullptr);
+	std::vector<std::shared_ptr<Evaluator>> evals{f_evaluator, evaluator};
+	Options options;
+	options.set("evals", evals);
+	options.set("pref_only", false);
+	options.set("unsafe_pruning", false);
+	open_list = std::make_unique<tiebreaking_open_list::TieBreakingOpenListFactory>(options)->create_state_open_list();
+	init_next_open_list();
+	assert(search_space != nullptr);
+
 	ENDF(__func__);
 }
 
 void RtSolveAll::dump_hstar_values() const
 {
-	std::cout << "not implemented yet\n";
-	assert(false);
+	BEGINF(__func__);
+	auto out = std::ofstream(hstar_file);
+	if (collect_parent_h) {
+		for (const auto &[state_id, values] : solved_states) {
+			const auto [h, hstar, ph] = values;
+			out << h << ' ' << hstar << ' ' << ph << '\n';
+		}
+	} else {
+		for (const auto &[state_id, values] : solved_states) {
+			const auto [h, hstar, ph] = values;
+			out << h << ' ' << hstar << '\n';
+		}
+	}
+
+	std::cout << "wrote h* data to " << hstar_file << '\n';
+	ENDF(__func__);
 }
 
-void RtSolveAll::dump_succ_values() const
+void RtSolveAll::dump_succ_value(std::ostream &out, const GlobalState &state, int h)
 {
-	std::cout << "not implemented yet\n";
-	assert(false);
+	applicables.clear();
+	successor_generator.generate_applicable_ops(state, applicables);
+	assert(!applicables.empty());
+	out << h;
+
+	for (auto op_id : applicables) {
+		auto op = task_proxy.get_operators()[op_id];
+		auto successor = state_registry.get_successor_state(state, op);
+		auto eval_context = EvaluationContext(successor);
+		if (!eval_context.is_evaluator_value_infinite(evaluator.get()))
+			out << " " << get_adjusted_cost(op) << " " << eval_context.get_evaluator_value(evaluator.get());
+	}
+
+	out << '\n';
 }
 
-void RtSolveAll::make_next_open_list()
+void RtSolveAll::dump_succ_values()
 {
 	BEGINF(__func__);
+	auto out = std::ofstream(successors_file);
+	for (const auto &[state_id, values] : solved_states) {
+		const auto [h, hstar, ph] = values;
+		GlobalState const &state{state_registry.lookup_state(state_id)};
+		if (task_properties::is_goal_state(task_proxy, state) || hstar == EvaluationResult::INFTY)
+			continue;
+		dump_succ_value(out, state, h);
+	}
+	for (const auto &state_id : *expanded_states) {
+		GlobalState const &state{state_registry.lookup_state(state_id)};
+		EvaluationContext evc{state};
+		if (task_properties::is_goal_state(task_proxy, state) || evc.is_evaluator_value_infinite(evaluator.get()))
+			continue;
+		const auto h = evc.get_evaluator_value(evaluator.get());
+		dump_succ_value(out, state, h);
+	}
+
+	std::cout << "wrote successors data to " << successors_file << '\n';
+	ENDF(__func__);
+}
+
+void RtSolveAll::init_next_open_list()
+{
+	BEGINF(__func__);
+	assert(open_list != nullptr);
 	auto const next_id = *(expanded_states->begin());
 	auto const next_state = state_registry.lookup_state(next_id);
 	open_list->clear();
@@ -133,7 +191,7 @@ SearchStatus RtSolveAll::update_hstar(SearchNode const &node, int hstar)
 		return SOLVED;
 	}
 
-	make_next_open_list();
+	init_next_open_list();
 
 	ENDF(__func__);
 
@@ -204,14 +262,13 @@ void RtSolveAll::eval_node(SearchNode &sn, OperatorProxy const &op, SearchNode c
 
 SearchStatus RtSolveAll::step()
 {
-  BEGINF(__func__);
+	BEGINF(__func__);
 	if (timer.is_expired()) {
 		dump_hstar_values();
 		dump_succ_values();
 		return TIMEOUT;
 	}
 
-	std::cout << "fetching next node\n";
 	auto next = fetch_next_node();
 	auto const &s = std::get<0>(next);
 	auto &n = std::get<1>(next);
@@ -219,7 +276,6 @@ SearchStatus RtSolveAll::step()
 	if (!b)
 		return FAILED;
 
-	std::cout << "checking for goal state\n";
 	if (task_properties::is_goal_state(task_proxy, s)) {
 		return update_hstar(n, 0);
 	}
@@ -230,7 +286,6 @@ SearchStatus RtSolveAll::step()
 	// no pruning method here
 	// no preferred ops here
 
-	std::cout << "expanding next state\n";
 	for (auto op_id : applicables) {
 		OperatorProxy op = task_proxy.get_operators()[op_id];
 		if ((n.get_real_g() + op.get_cost()) >= bound)
