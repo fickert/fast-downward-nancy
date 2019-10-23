@@ -7,6 +7,7 @@
 #include "expansion_delay.h"
 #include "heuristic_error.h"
 #include "lookhead_search.h"
+#include "lookahead_control.h"
 #include "../open_list.h"
 #include "../search_engine.h"
 
@@ -48,12 +49,19 @@ class RealTimeSearch : public SearchEngine {
 		NANCY,
 	};
 
+	enum class Bound
+	{
+	 EXPANSIONS,
+	 TIME,
+	};
+
 	std::unique_ptr<HStarData<int>> hstar_data;
 	std::unique_ptr<HStarData<long long>> post_expansion_belief_data;
 
 	const bool evaluate_heuristic_when_learning;
 
-	std::unique_ptr<LookaheadSearch> lookahead_search;
+	// std::unique_ptr<LookaheadSearch> lookahead_search;
+	LookaheadControl lc;
 	LearningMethod learning_method;
 	// C++ doesn't let me put the learning method classes into a union
 	// unfortunately, because of non-trivial types
@@ -78,7 +86,7 @@ protected:
 public:
 	explicit RealTimeSearch(const options::Options &opts);
 	~RealTimeSearch() override {};
-	auto get_expanded_states() -> std::unique_ptr<std::unordered_set<StateID> > override { return std::move(lookahead_search->get_expanded_states()); }
+	auto get_expanded_states() -> std::unique_ptr<std::unordered_set<StateID> > override { return std::move(lc.ls->get_expanded_states()); }
 
 	void print_statistics() const override;
 };

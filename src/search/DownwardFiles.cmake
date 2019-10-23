@@ -775,6 +775,7 @@ fast_downward_plugin(
         real_time/heuristic_error
         real_time/learning_evaluator
         real_time/lookhead_search
+        real_time/lookahead_control
         real_time/state_collector
         real_time/real_time_search
         real_time/util

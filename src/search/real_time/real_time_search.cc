@@ -53,22 +53,32 @@ RealTimeSearch::RealTimeSearch(const options::Options &opts)
 	bool const store_exploration_data = learning_method != LearningMethod::NONE;
 	//bool const store_exploration_data = true;
 
+	std::cout << "initializing lookahead termination condition\n";
+	switch (Bound(opts.get_enum("lookahead_term"))) {
+	case Bound::EXPANSIONS:
+		lc.lb = std::make_unique<ExpansionBound>(statistics, opts.get<int>("lookahead_bound"));
+		break;
+	case Bound::TIME:
+		lc.lb = std::make_unique<TimeBound>(opts.get<double>("time_bound"));
+		break;
+	}
+
 	std::cout << "initializing lookahead method\n";
 	switch (LookaheadSearchMethod(opts.get_enum("lookahead_search"))) {
 	case LookaheadSearchMethod::A_STAR_COLLECT:
-		lookahead_search = std::make_unique<AStarCollect>(state_registry, opts.get<int>("lookahead_bound"), heuristic, store_exploration_data, expansion_delay.get(), heuristic_error.get(), this);
+		lc.ls = std::make_unique<AStarCollect>(state_registry, opts.get<int>("lookahead_bound"), heuristic, store_exploration_data, expansion_delay.get(), heuristic_error.get(), this);
 		break;
 	case LookaheadSearchMethod::A_STAR:
-		lookahead_search = std::make_unique<AStarLookaheadSearch>(state_registry, opts.get<int>("lookahead_bound"), heuristic, store_exploration_data, expansion_delay.get(), heuristic_error.get(), this);
+		lc.ls = std::make_unique<AStarLookaheadSearch>(state_registry, opts.get<int>("lookahead_bound"), heuristic, store_exploration_data, expansion_delay.get(), heuristic_error.get(), this);
 		break;
 	case LookaheadSearchMethod::BREADTH_FIRST:
-		lookahead_search = std::make_unique<BreadthFirstLookaheadSearch>(state_registry, opts.get<int>("lookahead_bound"), store_exploration_data, expansion_delay.get(), heuristic_error.get(), this);
+		lc.ls = std::make_unique<BreadthFirstLookaheadSearch>(state_registry, opts.get<int>("lookahead_bound"), store_exploration_data, expansion_delay.get(), heuristic_error.get(), this);
 		break;
 	case LookaheadSearchMethod::F_HAT:
-		lookahead_search = std::make_unique<FHatLookaheadSearch>(state_registry, opts.get<int>("lookahead_bound"), heuristic, distance_heuristic, store_exploration_data, expansion_delay.get(), *heuristic_error, this);
+		lc.ls = std::make_unique<FHatLookaheadSearch>(state_registry, opts.get<int>("lookahead_bound"), heuristic, distance_heuristic, store_exploration_data, expansion_delay.get(), *heuristic_error, this);
 		break;
 	case LookaheadSearchMethod::RISK:
-		lookahead_search = std::make_unique<RiskLookaheadSearch>(state_registry, opts.get<int>("lookahead_bound"), heuristic, base_heuristic, distance_heuristic, store_exploration_data, expansion_delay.get(), heuristic_error.get(), hstar_data.get(), post_expansion_belief_data.get(), this, f_kind, pf_kind);
+		lc.ls = std::make_unique<RiskLookaheadSearch>(state_registry, opts.get<int>("lookahead_bound"), heuristic, base_heuristic, distance_heuristic, store_exploration_data, expansion_delay.get(), heuristic_error.get(), hstar_data.get(), post_expansion_belief_data.get(), this, f_kind, pf_kind);
 		break;
 	default:
 		std::cerr << "unknown lookahead search method: " << opts.get_enum("lookahead_search") << std::endl;
@@ -88,8 +98,8 @@ RealTimeSearch::RealTimeSearch(const options::Options &opts)
 			this);
 		break;
 	case LearningMethod::NANCY:
-		auto beliefs = lookahead_search->get_beliefs();
-		auto post_beliefs = lookahead_search->get_post_beliefs();
+		auto beliefs = lc.ls->get_beliefs();
+		auto post_beliefs = lc.ls->get_post_beliefs();
 		nancy_learning = std::make_unique<NancyLearning>(state_registry, this, beliefs, post_beliefs);
 		break;
 	}
@@ -120,7 +130,7 @@ RealTimeSearch::RealTimeSearch(const options::Options &opts)
 		break;
 	}
 	case DecisionStrategy::NANCY: {
-		auto const tlas = this->lookahead_search->get_tlas();
+		auto const tlas = this->lc.ls->get_tlas();
 		assert(tlas);
 		nancy_decision_strategy = std::make_unique<NancyDecisionStrategy>(tlas, *this, state_registry, current_state.get_id());
 		decision_strategy = nullptr;
@@ -175,10 +185,10 @@ void RealTimeSearch::initialize() {
 
 SearchStatus RealTimeSearch::step() {
 	++num_rts_phases;
-	lookahead_search->initialize(current_state);
-	const auto status = lookahead_search->search();
+	lc.ls->initialize(current_state);
+	const auto status = lc.search();
 
-	const SearchStatistics &current_stats = lookahead_search->get_statistics();
+	const SearchStatistics &current_stats = lc.ls->get_statistics();
 	statistics.inc_expanded(current_stats.get_expanded());
 	statistics.inc_evaluated_states(current_stats.get_evaluated_states());
 	statistics.inc_evaluations(current_stats.get_evaluations());
@@ -193,7 +203,7 @@ SearchStatus RealTimeSearch::step() {
 		auto overall_plan = Plan();
 		// NOTE: the returned plan does not correspond to the agent's actual movements as it removes cycles
 		search_space.trace_path(current_state, overall_plan);
-		auto plan = lookahead_search->get_plan();
+		auto plan = lc.ls->get_plan();
 		for (auto op_id : plan)
 			solution_cost += get_adjusted_cost(task_proxy.get_operators()[op_id]);
 		overall_plan.insert(std::end(overall_plan), std::begin(plan), std::end(plan));
@@ -201,31 +211,34 @@ SearchStatus RealTimeSearch::step() {
 		return SOLVED;
 	}
 
-	if (lookahead_search->get_frontier().empty())
+	if (lc.ls->get_frontier().empty())
 		return FAILED;
 
   switch (learning_method) {
   case LearningMethod::NONE:
     break;
   case LearningMethod::DIJKSTRA:
-    dijkstra_learning->apply_updates(lookahead_search->get_predecessors(), lookahead_search->get_frontier(), lookahead_search->get_closed(), evaluate_heuristic_when_learning);
+    dijkstra_learning->apply_updates(lc.ls->get_predecessors(), lc.ls->get_frontier(), lc.ls->get_closed(), evaluate_heuristic_when_learning);
     break;
   case LearningMethod::NANCY:
-    nancy_learning->apply_updates(lookahead_search->get_predecessors(), lookahead_search->get_frontier(), lookahead_search->get_closed(), current_state);
+    nancy_learning->apply_updates(lc.ls->get_predecessors(), lc.ls->get_frontier(), lc.ls->get_closed(), current_state);
     break;
   }
+
+  // TODO: do it properly
+  // LookaheadControl lc{nullptr, ExpansionBound(statistics, 100)};
 
   OperatorID best_top_level_action(0);
   switch (decision_strategy_type) {
   case DecisionStrategy::NANCY:
     assert(nancy_decision_strategy);
-    best_top_level_action = nancy_decision_strategy->pick_top_level_action(lookahead_search->get_search_space());
+    best_top_level_action = nancy_decision_strategy->pick_top_level_action(lc.ls->get_search_space());
     break;
   default:
-    best_top_level_action = decision_strategy->get_top_level_action(lookahead_search->get_frontier(), lookahead_search->get_search_space());
+    best_top_level_action = decision_strategy->get_top_level_action(lc.ls->get_frontier(), lc.ls->get_search_space());
     break;
   }
-	//const auto best_top_level_action = decision_strategy->get_top_level_action(lookahead_search->get_frontier(), lookahead_search->get_search_space());
+	//const auto best_top_level_action = decision_strategy->get_top_level_action(lc.ls->get_frontier(), lc.ls->get_search_space());
 	const auto parent_node = search_space.get_node(current_state);
 	const auto op = task_proxy.get_operators()[best_top_level_action];
 	solution_cost += get_adjusted_cost(op);
@@ -247,7 +260,7 @@ void RealTimeSearch::print_statistics() const {
 			std::cout << "Average distance error: " << heuristic_error->get_average_distance_error() << std::endl;
 	}
 	std::cout << "Fallback to gaussian (decision strategy): " << gaussian_fallback_count << std::endl;
-	lookahead_search->print_statistics();
+	lc.ls->print_statistics();
 }
 
 static auto _parse(options::OptionParser &parser) -> std::shared_ptr<SearchEngine> {
@@ -255,7 +268,10 @@ static auto _parse(options::OptionParser &parser) -> std::shared_ptr<SearchEngin
 	parser.add_option<std::shared_ptr<Evaluator>>("h", "heuristic");
 	parser.add_option<std::shared_ptr<Evaluator>>("distance_heuristic", "distance heuristic", options::OptionParser::NONE);
 	parser.add_option<int>("lookahead_bound","Lookahead bound in number of expansions.", "100");
+	// TODO: check if the default value here makes any sense.
+	parser.add_option<double>("time_bound","Lookahead bound in milli seconds.", "1000");
 	parser.add_enum_option("lookahead_search", {"A_STAR", "A_STAR_COLLECT", "F_HAT", "BREADTH_FIRST", "RISK"}, "Lookahead search algorithm", "A_STAR");
+	parser.add_enum_option("lookahead_term", {"EXPANSIONS", "TIME"}, "Type of bound the algorithm is running under", "EXPANSIONS");
 	parser.add_enum_option("learning", {"NONE","DIJKSTRA","NANCY"}, "What kind of learning update to perform (DIJKSTRA for heuristic values, NANCY for beliefs)", "NONE");
 	parser.add_enum_option("decision_strategy", {"MINIMIN", "BELLMAN", "NANCY", "CSERNA", "K_BEST"}, "Top-level action selection strategy", "MINIMIN");
 	parser.add_enum_option("feature_kind", {"JUST_H", "WITH_PARENT_H"}, "Kind of features to look up the beliefs in the data (the data format has to match)", "JUST_H");

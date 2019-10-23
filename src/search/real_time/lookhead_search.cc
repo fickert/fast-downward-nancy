@@ -75,74 +75,78 @@ void EagerLookaheadSearch::initialize(const GlobalState &initial_state) {
 		open_list_insertion_time[initial_state.get_id()] = 0;
 }
 
-auto EagerLookaheadSearch::search() -> SearchStatus {
+auto EagerLookaheadSearch::step() -> SearchStatus
+{
 	assert(statistics);
-	while (statistics->get_expanded() < lookahead_bound) {
-		if (open_list->empty())
-			return FAILED;
+	if (open_list->empty())
+		return FAILED;
 
-		const auto id = open_list->remove_min();
-		const auto state = state_registry.lookup_state(id);
-		auto node = search_space->get_node(state);
+ get_node:
+	const auto id = open_list->remove_min();
+	const auto state = state_registry.lookup_state(id);
+	auto node = search_space->get_node(state);
 
-		if (node.is_closed())
+	if (node.is_closed())
+		goto get_node;
+
+	mark_expanded(node);
+
+	if (check_goal_and_set_plan(state))
+		return SOLVED;
+
+	auto applicable_ops = std::vector<OperatorID>();
+	successor_generator.generate_applicable_ops(state, applicable_ops);
+
+	auto eval_context = EvaluationContext(state, node.get_g(), false, statistics.get());
+	if (heuristic_error)
+		heuristic_error->set_expanding_state(state);
+
+	for (auto op_id : applicable_ops) {
+		const auto op = task_proxy.get_operators()[op_id];
+		const auto succ_state = state_registry.get_successor_state(state, op);
+		statistics->inc_generated();
+		auto succ_node = search_space->get_node(succ_state);
+
+		if (store_exploration_data)
+			predecessors[succ_state.get_id()].emplace_back(id, op);
+
+		// Previously encountered dead end. Don't re-evaluate.
+		if (succ_node.is_dead_end())
 			continue;
 
-		mark_expanded(node);
+		auto const adj_cost = search_engine->get_adjusted_cost(op);
 
-		if (check_goal_and_set_plan(state))
-			return SOLVED;
-
-		auto applicable_ops = std::vector<OperatorID>();
-		successor_generator.generate_applicable_ops(state, applicable_ops);
-
-		auto eval_context = EvaluationContext(state, node.get_g(), false, statistics.get());
-		if (heuristic_error)
-			heuristic_error->set_expanding_state(state);
-
-		for (auto op_id : applicable_ops) {
-			const auto op = task_proxy.get_operators()[op_id];
-			const auto succ_state = state_registry.get_successor_state(state, op);
-			statistics->inc_generated();
-			auto succ_node = search_space->get_node(succ_state);
-
-			if (store_exploration_data)
-				predecessors[succ_state.get_id()].emplace_back(id, op);
-
-			// Previously encountered dead end. Don't re-evaluate.
-			if (succ_node.is_dead_end())
+		if (succ_node.is_new()) {
+			auto succ_eval_context = EvaluationContext(succ_state, node.get_g() + adj_cost, false, statistics.get());
+			statistics->inc_evaluated_states();
+			if (open_list->is_dead_end(succ_eval_context)) {
+				succ_node.mark_as_dead_end();
+				statistics->inc_dead_ends();
 				continue;
-
-			auto const adj_cost = search_engine->get_adjusted_cost(op);
-
-			if (succ_node.is_new()) {
-				auto succ_eval_context = EvaluationContext(succ_state, node.get_g() + adj_cost, false, statistics.get());
-				statistics->inc_evaluated_states();
-				if (open_list->is_dead_end(succ_eval_context)) {
-					succ_node.mark_as_dead_end();
-					statistics->inc_dead_ends();
-					continue;
-				}
-				succ_node.open(node, op, adj_cost);
-				open_list->insert(succ_eval_context, succ_state.get_id());
-			} else if (succ_node.get_g() > node.get_g() + adj_cost) {
-				// We found a new cheapest path to an open or closed state.
-				if (succ_node.is_closed())
-					statistics->inc_reopened();
-				succ_node.reopen(node, op, search_engine->get_adjusted_cost(op));
-				auto succ_eval_context = EvaluationContext(succ_state, succ_node.get_g(), false, statistics.get());
-				open_list->insert(succ_eval_context, succ_state.get_id());
 			}
-			open_list_insertion_time[id] = statistics->get_expanded();
-			if (heuristic_error)
-				heuristic_error->add_successor(succ_node, adj_cost);
+			succ_node.open(node, op, adj_cost);
+			open_list->insert(succ_eval_context, succ_state.get_id());
+		} else if (succ_node.get_g() > node.get_g() + adj_cost) {
+			// We found a new cheapest path to an open or closed state.
+			if (succ_node.is_closed())
+				statistics->inc_reopened();
+			succ_node.reopen(node, op, search_engine->get_adjusted_cost(op));
+			auto succ_eval_context = EvaluationContext(succ_state, succ_node.get_g(), false, statistics.get());
+			open_list->insert(succ_eval_context, succ_state.get_id());
 		}
+		open_list_insertion_time[id] = statistics->get_expanded();
 		if (heuristic_error)
-			heuristic_error->update_error();
+			heuristic_error->add_successor(succ_node, adj_cost);
 	}
+	if (heuristic_error)
+		heuristic_error->update_error();
+	return IN_PROGRESS;
+}
+
+void EagerLookaheadSearch::post()
+{
 	while (!open_list->empty())
 		frontier.push_back(open_list->remove_min());
-	return IN_PROGRESS;
 }
 
 auto AStarLookaheadSearch::create_open_list() const -> std::unique_ptr<StateOpenList> {

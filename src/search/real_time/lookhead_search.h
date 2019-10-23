@@ -64,7 +64,9 @@ public:
 	auto operator=(LookaheadSearch &&) = delete;
 
 	virtual void initialize(const GlobalState &initial_state);
-	virtual auto search() -> SearchStatus = 0;
+	// virtual auto search() -> SearchStatus = 0;
+	virtual auto step() -> SearchStatus = 0;
+	virtual auto post() -> void = 0;
 
 	virtual void print_statistics() const {}
 
@@ -104,7 +106,8 @@ public:
 	auto operator=(EagerLookaheadSearch &&) = delete;
 
 	void initialize(const GlobalState &initial_state) override;
-	auto search() -> SearchStatus final;
+	auto step() -> SearchStatus final;
+	auto post() -> void final;
 };
 
 class AStarLookaheadSearch : public EagerLookaheadSearch {
