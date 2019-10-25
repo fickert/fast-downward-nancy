@@ -257,6 +257,9 @@ void RealTimeSearch::print_statistics() const {
 			std::cout << "Average distance error: " << heuristic_error->get_average_distance_error() << std::endl;
 	}
 	std::cout << "Fallback to gaussian (decision strategy): " << gaussian_fallback_count << std::endl;
+	// ugly hack because the method is const, but i just want to
+	// sort some values first.
+	(const_cast<RealTimeSearch*>(this))->sc.prepare_statistics();
 	sc.print_statistics();
 }
 

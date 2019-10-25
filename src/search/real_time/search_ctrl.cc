@@ -152,15 +152,17 @@ void MaxTime::initialize(LookaheadSearch const &ls)
 	ENDF(__func__);
 }
 
+void SearchCtrl::prepare_statistics()
+{
+	std::sort(expansions.begin(), expansions.end());
+}
 
 void SearchCtrl::print_statistics() const
 {
 	ls->print_statistics();
 
-	// TODO: check if this actually moves or makes a copy.
-	// wouldn't really matter, it's just stats printing after all.
-	auto v = std::move(expansions);
-	std::sort(v.begin(), v.end());
+	assert(std::is_sorted(expansions.begin(), expansions.end()));
+	auto const &v = expansions;
 	size_t s = v.size();
 	assert(s > 0);
 	int avg = std::accumulate(v.begin(), v.end(), 0) / s;

@@ -52,6 +52,7 @@ struct SearchCtrl
 	void learn();
 	OperatorID select_action();
 
+	void prepare_statistics();
 	void print_statistics() const;
 };
 
