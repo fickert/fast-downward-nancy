@@ -764,6 +764,7 @@ fast_downward_plugin(
     NAME REAL_TIME
     HELP "Real-time search"
     SOURCES
+        real_time/kinds
         real_time/solve_all
         real_time/astar_solve_all
 	real_time/rt_solve_all
@@ -775,7 +776,7 @@ fast_downward_plugin(
         real_time/heuristic_error
         real_time/learning_evaluator
         real_time/lookhead_search
-        real_time/lookahead_control
+        real_time/search_ctrl
         real_time/state_collector
         real_time/real_time_search
         real_time/util

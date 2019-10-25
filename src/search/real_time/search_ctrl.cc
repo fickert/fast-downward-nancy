@@ -3,12 +3,12 @@
 #include <numeric>   // accumulate
 #include <algorithm> // sort
 
-// #define TRACKLC
+// #define TRACKSC
 
-#ifdef TRACKLC
-#define BEGINF(X) std::cout << "LC: ENTER: " << X << "\n";
-#define ENDF(X) std::cout << "LC: EXIT: " << X << "\n";
-#define TRACKP(X) std::cout << "LC: " << X << "\n";
+#ifdef TRACKSC
+#define BEGINF(X) std::cout << "SC: ENTER: " << X << "\n";
+#define ENDF(X) std::cout << "SC: EXIT: " << X << "\n";
+#define TRACKP(X) std::cout << "SC: " << X << "\n";
 #else
 #define BEGINF(X)
 #define ENDF(X)
@@ -18,14 +18,31 @@
 namespace real_time
 {
 
-SearchCtrl::SearchCtrl() : ls(nullptr), lb(nullptr) {}
+SearchCtrl::SearchCtrl(GlobalState const &s, LookaheadSearchMethod lsm, LearningMethod lm, DecisionStrategy ds)
+	: cs(&s),
+	  lb(nullptr),
+	  lsm(lsm),
+	  ls(nullptr),
+	  lm(lm),
+	  h_before_learn(lsm == LookaheadSearchMethod::BREADTH_FIRST),
+	  dl(nullptr),
+	  nl(nullptr),
+	  ds(ds),
+	  sd(nullptr),
+	  dd(nullptr),
+	  learning_done(true)
+{}
 SearchCtrl::~SearchCtrl() {}
 
 void SearchCtrl::initialize(GlobalState const &s)
 {
+	cs = &s;
 	BEGINF(__func__);
 	ls->initialize(s);
 	assert(lb != nullptr);
+	// TODO: implement a way here to make a choice how long we'll
+	// do look-ahead. based on how much time one iteration takes
+	// at most.
 	lb->initialize(*ls);
 	ENDF(__func__)
 }
@@ -34,6 +51,8 @@ void SearchCtrl::initialize(GlobalState const &s)
 SearchStatus SearchCtrl::search()
 {
 	BEGINF(__func__);
+	// TODO: check flag if we need to finish learning from
+	// previous iteration first.
 	SearchStatus res = IN_PROGRESS;
 	while (lb->ok() && res == IN_PROGRESS) {
 		res = ls->step();
@@ -52,44 +71,22 @@ SearchStatus SearchCtrl::search()
 
 void SearchCtrl::learn()
 {
-	switch (learning_method) {
-	case LearningMethod::NONE:
-		break;
-	case LearningMethod::DIJKSTRA:
-		dijkstra_learning->apply_updates(lc.ls->get_predecessors(), lc.ls->get_frontier(), lc.ls->get_closed(), evaluate_heuristic_when_learning);
-		break;
-	case LearningMethod::NANCY:
-		nancy_learning->apply_updates(lc.ls->get_predecessors(), lc.ls->get_frontier(), lc.ls->get_closed(), current_state);
-		break;
+	// TODO: make learning steppable, interupt if out of time and set the
+	// flag to continue learning next iteration
+	switch (lm) {
+	case LearningMethod::NONE: break;
+	case LearningMethod::DIJKSTRA: dl->apply_updates(ls->get_predecessors(), ls->get_frontier(), ls->get_closed(), h_before_learn); break;
+	case LearningMethod::NANCY:    nl->apply_updates(ls->get_predecessors(), ls->get_frontier(), ls->get_closed(), *cs); break;
 	}
-
 }
 
-void SearchCtrl::act()
+OperatorID SearchCtrl::select_action()
 {
-	OperatorID best_tla(0);
-	switch (decision_strategy_type) {
-	case DecisionStrategy::NANCY:
-		assert(nancy_decision_strategy);
-		best_tla = dd->pick_top_level_action(lc.ls->get_search_space());
-		break;
-	default:
-		best_tla = sd->get_top_level_action(lc.ls->get_frontier(), lc.ls->get_search_space());
-		break;
+	switch (ds) {
+	case DecisionStrategy::NANCY: return dd->pick_top_level_action(ls->get_search_space()); break;
+	default:                      return sd->get_top_level_action(ls->get_frontier(), ls->get_search_space());   break;
 	}
-
-	const auto parent_node = search_space.get_node(current_state);
-	const auto op = task_proxy.get_operators()[best_tla];
-	solution_cost += get_adjusted_cost(op);
-	// std::cout << "executing action " << op.get_name() << " with cost " << get_adjusted_cost(op) << "\n";
-	current_state = state_registry.get_successor_state(current_state, op);
-	auto next_node = search_space.get_node(current_state);
-	if (next_node.is_new())
-		next_node.open(parent_node, op, get_adjusted_cost(op));
 }
-
-
-
 
 MaxExpansions::MaxExpansions(int b): stats(nullptr), bound(b) {}
 
@@ -130,9 +127,9 @@ void RtTimer::reset()
 }
 
 
-TimeBound::TimeBound(int ms) : max_ms(std::chrono::duration<int, std::milli>(ms)) {BEGINF(__func__); ENDF(__func__);}
+MaxTime::MaxTime(int ms) : max_ms(std::chrono::duration<int, std::milli>(ms)) {BEGINF(__func__); ENDF(__func__);}
 
-bool TimeBound::ok() const
+bool MaxTime::ok() const
 {
 	// BEGINF(__func__);
 	// auto d = timer.diff();
@@ -147,7 +144,7 @@ bool TimeBound::ok() const
 	return timer.diff() < max_ms;
 }
 
-void TimeBound::initialize(LookaheadSearch const &ls)
+void MaxTime::initialize(LookaheadSearch const &ls)
 {
 	BEGINF(__func__);
 	(void)&ls;
@@ -156,16 +153,12 @@ void TimeBound::initialize(LookaheadSearch const &ls)
 }
 
 
-
-
 void SearchCtrl::print_statistics() const
 {
 	ls->print_statistics();
 
-	// hack since I need to sort the vector and this is a const
-	// method.  this is fine though since the statistics are only
-	// printed once in the end, so moving the vector doesn't
-	// matter anymore.
+	// TODO: check if this actually moves or makes a copy.
+	// wouldn't really matter, it's just stats printing after all.
 	auto v = std::move(expansions);
 	std::sort(v.begin(), v.end());
 	size_t s = v.size();
@@ -181,7 +174,7 @@ void SearchCtrl::print_statistics() const
 		  << "Median expansions: " << med << "\n";
 }
 
-]
+}
 
 #undef BEGINF
 #undef ENDF

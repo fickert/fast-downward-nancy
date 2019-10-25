@@ -33,8 +33,10 @@ RealTimeSearch::RealTimeSearch(const options::Options &opts)
 	  num_rts_phases(0),
 	  solution_cost(0),
 	  gaussian_fallback_count(0),
-	  evaluate_heuristic_when_learning(LookaheadSearchMethod(opts.get_enum("lookahead_search")) == LookaheadSearchMethod::BREADTH_FIRST),
-    learning_method(LearningMethod(opts.get_enum("learning")))
+	  sc(current_state,
+	     LookaheadSearchMethod(opts.get_enum("lookahead_search")),
+	     LearningMethod(opts.get_enum("learning")),
+	     DecisionStrategy(opts.get_enum("decision_strategy")))
 {
   BEGINF(__func__);
 	DataFeatureKind f_kind = static_cast<DataFeatureKind>(opts.get_enum("feature_kind"));
@@ -46,29 +48,29 @@ RealTimeSearch::RealTimeSearch(const options::Options &opts)
 
 	heuristic = opts.get<std::shared_ptr<Evaluator>>("h");
 	base_heuristic = heuristic;
-	if (learning_method == LearningMethod::DIJKSTRA)
+	if (sc.lm == LearningMethod::DIJKSTRA)
 		heuristic = std::make_shared<LearningEvaluator>(heuristic);
 	initialize_optional_features(opts);
 
-	bool const store_exploration_data = learning_method != LearningMethod::NONE;
+	bool const store_exploration_data = sc.lm != LearningMethod::NONE;
 	//bool const store_exploration_data = true;
 
 	std::cout << "initializing lookahead method\n";
-	switch (LookaheadSearchMethod(opts.get_enum("lookahead_search"))) {
+	switch (sc.lsm) {
 	case LookaheadSearchMethod::A_STAR_COLLECT:
-		lc.ls = std::make_unique<AStarCollect>(state_registry, opts.get<int>("lookahead_bound"), heuristic, store_exploration_data, expansion_delay.get(), heuristic_error.get(), this);
+		sc.ls = std::make_unique<AStarCollect>(state_registry, opts.get<int>("lookahead_bound"), heuristic, store_exploration_data, expansion_delay.get(), heuristic_error.get(), this);
 		break;
 	case LookaheadSearchMethod::A_STAR:
-		lc.ls = std::make_unique<AStarLookaheadSearch>(state_registry, opts.get<int>("lookahead_bound"), heuristic, store_exploration_data, expansion_delay.get(), heuristic_error.get(), this);
+		sc.ls = std::make_unique<AStarLookaheadSearch>(state_registry, opts.get<int>("lookahead_bound"), heuristic, store_exploration_data, expansion_delay.get(), heuristic_error.get(), this);
 		break;
 	case LookaheadSearchMethod::BREADTH_FIRST:
-		lc.ls = std::make_unique<BreadthFirstLookaheadSearch>(state_registry, opts.get<int>("lookahead_bound"), store_exploration_data, expansion_delay.get(), heuristic_error.get(), this);
+		sc.ls = std::make_unique<BreadthFirstLookaheadSearch>(state_registry, opts.get<int>("lookahead_bound"), store_exploration_data, expansion_delay.get(), heuristic_error.get(), this);
 		break;
 	case LookaheadSearchMethod::F_HAT:
-		lc.ls = std::make_unique<FHatLookaheadSearch>(state_registry, opts.get<int>("lookahead_bound"), heuristic, distance_heuristic, store_exploration_data, expansion_delay.get(), *heuristic_error, this);
+		sc.ls = std::make_unique<FHatLookaheadSearch>(state_registry, opts.get<int>("lookahead_bound"), heuristic, distance_heuristic, store_exploration_data, expansion_delay.get(), *heuristic_error, this);
 		break;
 	case LookaheadSearchMethod::RISK:
-		lc.ls = std::make_unique<RiskLookaheadSearch>(state_registry, opts.get<int>("lookahead_bound"), heuristic, base_heuristic, distance_heuristic, store_exploration_data, expansion_delay.get(), heuristic_error.get(), hstar_data.get(), post_expansion_belief_data.get(), this, f_kind, pf_kind);
+		sc.ls = std::make_unique<RiskLookaheadSearch>(state_registry, opts.get<int>("lookahead_bound"), heuristic, base_heuristic, distance_heuristic, store_exploration_data, expansion_delay.get(), heuristic_error.get(), hstar_data.get(), post_expansion_belief_data.get(), this, f_kind, pf_kind);
 		break;
 	default:
 		std::cerr << "unknown lookahead search method: " << opts.get_enum("lookahead_search") << std::endl;
@@ -78,15 +80,15 @@ RealTimeSearch::RealTimeSearch(const options::Options &opts)
 	std::cout << "initializing lookahead termination condition\n";
 	switch (BoundKind(opts.get_enum("rtbound_type"))) {
 	case BoundKind::EXPANSIONS:
-		lc.lb = std::make_unique<ExpansionBound>(opts.get<int>("lookahead_bound"));
+		sc.lb = std::make_unique<MaxExpansions>(opts.get<int>("lookahead_bound"));
 		break;
 	case BoundKind::TIME:
-		lc.lb = std::make_unique<TimeBound>(opts.get<int>("time_bound"));
+		sc.lb = std::make_unique<MaxTime>(opts.get<int>("time_bound"));
 		break;
 	}
 
 	std::cout << "initializing learning method\n";
-	switch (learning_method) {
+	switch (sc.lm) {
 	case LearningMethod::NONE:
 		sc.dl = nullptr;
 		sc.nl = nullptr;
@@ -101,15 +103,14 @@ RealTimeSearch::RealTimeSearch(const options::Options &opts)
 		break;
 	case LearningMethod::NANCY:
 		sc.dl = nullptr;
-		auto beliefs = lc.ls->get_beliefs();
-		auto post_beliefs = lc.ls->get_post_beliefs();
+		auto beliefs = sc.ls->get_beliefs();
+		auto post_beliefs = sc.ls->get_post_beliefs();
 		sc.nl = std::make_unique<NancyLearning>(state_registry, this, beliefs, post_beliefs);
 		break;
 	}
 
 	std::cout << "initializing decision strat\n";
-	decision_strategy_type = DecisionStrategy(opts.get_enum("decision_strategy"));
-	switch (decision_strategy_type) {
+	switch (sc.ds) {
 	case DecisionStrategy::MINIMIN: {
 		auto f_evaluator = std::make_shared<sum_evaluator::SumEvaluator>(std::vector<std::shared_ptr<Evaluator>>{heuristic, std::make_shared<g_evaluator::GEvaluator>()});
 		sc.sd = std::make_unique<ScalarDecider>(state_registry,
@@ -135,7 +136,7 @@ RealTimeSearch::RealTimeSearch(const options::Options &opts)
 		break;
 	}
 	case DecisionStrategy::NANCY: {
-		auto const tlas = this->lc.ls->get_tlas();
+		auto const tlas = this->sc.ls->get_tlas();
 		assert(tlas);
 		sc.sd = nullptr;
 		sc.dd = std::make_unique<DistributionDecider>(tlas, *this, state_registry, current_state.get_id());
@@ -151,19 +152,20 @@ RealTimeSearch::RealTimeSearch(const options::Options &opts)
 }
 
 void RealTimeSearch::initialize_optional_features(const options::Options &opts) {
-	if (LookaheadSearchMethod(opts.get_enum("lookahead_search")) == LookaheadSearchMethod::F_HAT ||
-		LookaheadSearchMethod(opts.get_enum("lookahead_search")) == LookaheadSearchMethod::RISK ||
-		DecisionStrategy(opts.get_enum("decision_strategy")) != DecisionStrategy::MINIMIN) {
+	if (sc.lsm == LookaheadSearchMethod::F_HAT ||
+	    sc.lsm == LookaheadSearchMethod::RISK ||
+	    sc.ds != DecisionStrategy::MINIMIN)
+	{
 		if (task_properties::is_unit_cost(task_proxy) || opts.get<std::shared_ptr<Evaluator>>("h") == opts.get<std::shared_ptr<Evaluator>>("distance_heuristic")) {
 			distance_heuristic = heuristic;
 		} else {
 			distance_heuristic = opts.get<std::shared_ptr<Evaluator>>("distance_heuristic");
-			if (learning_method == LearningMethod::DIJKSTRA)
+			if (sc.lm == LearningMethod::DIJKSTRA)
 				distance_heuristic = std::make_shared<LearningEvaluator>(distance_heuristic);
 		}
 		heuristic_error = std::make_unique<HeuristicError>(state_registry, heuristic, distance_heuristic);
 	}
-	if (LookaheadSearchMethod(opts.get_enum("lookahead_search")) == LookaheadSearchMethod::RISK)
+	if (sc.lsm == LookaheadSearchMethod::RISK)
 		expansion_delay = std::make_unique<ExpansionDelay>(opts.get<int>("expansion_delay_window_size"));
 }
 
@@ -192,12 +194,12 @@ void RealTimeSearch::initialize() {
 
 SearchStatus RealTimeSearch::step() {
 	++num_rts_phases;
-	lc.initialize(current_state);
+	sc.initialize(current_state);
 	TRACKP("doing lookahead");
-	const auto status = lc.search();
+	const auto status = sc.search();
 	TRACKP("finished lookahead");
 
-	const SearchStatistics &current_stats = lc.ls->get_statistics();
+	const SearchStatistics &current_stats = sc.ls->get_statistics();
 	statistics.inc_expanded(current_stats.get_expanded());
 	statistics.inc_evaluated_states(current_stats.get_evaluated_states());
 	statistics.inc_evaluations(current_stats.get_evaluations());
@@ -212,7 +214,7 @@ SearchStatus RealTimeSearch::step() {
 		auto overall_plan = Plan();
 		// NOTE: the returned plan does not correspond to the agent's actual movements as it removes cycles
 		search_space.trace_path(current_state, overall_plan);
-		auto plan = lc.ls->get_plan();
+		auto plan = sc.ls->get_plan();
 		for (auto op_id : plan)
 			solution_cost += get_adjusted_cost(task_proxy.get_operators()[op_id]);
 		overall_plan.insert(std::end(overall_plan), std::begin(plan), std::end(plan));
@@ -220,7 +222,7 @@ SearchStatus RealTimeSearch::step() {
 		return SOLVED;
 	}
 
-	if (lc.ls->get_frontier().empty())
+	if (sc.ls->get_frontier().empty())
 		return FAILED;
 
 	TRACKP("learning/backup");
@@ -228,10 +230,19 @@ SearchStatus RealTimeSearch::step() {
 	// before learning (I don't think it does).  Then we could
 	// learn later, and be safer with respect to the time
 	// deadline.
-	lc.learn();
+	sc.learn();
 
 	TRACKP("action selection");
-	lc.act();
+	OperatorID best_tla = sc.select_action();
+
+	const auto parent_node = search_space.get_node(current_state);
+	const auto op = task_proxy.get_operators()[best_tla];
+	solution_cost += get_adjusted_cost(op);
+	// std::cout << "executing action " << op.get_name() << " with cost " << get_adjusted_cost(op) << "\n";
+	current_state = state_registry.get_successor_state(current_state, op);
+	auto next_node = search_space.get_node(current_state);
+	if (next_node.is_new())
+		next_node.open(parent_node, op, get_adjusted_cost(op));
 
 	return IN_PROGRESS;
 }
@@ -246,7 +257,7 @@ void RealTimeSearch::print_statistics() const {
 			std::cout << "Average distance error: " << heuristic_error->get_average_distance_error() << std::endl;
 	}
 	std::cout << "Fallback to gaussian (decision strategy): " << gaussian_fallback_count << std::endl;
-	lc.print_statistics();
+	sc.print_statistics();
 }
 
 static auto _parse(options::OptionParser &parser) -> std::shared_ptr<SearchEngine> {

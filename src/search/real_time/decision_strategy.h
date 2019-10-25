@@ -12,11 +12,13 @@ class SearchSpace;
 class StateRegistry;
 class SearchEngine;
 
-namespace real_time {
+namespace real_time
+{
 
 struct TLAs;
 
-class ScalarDecider {
+class ScalarDecider
+{
 	const StateRegistry &state_registry;
 	std::function<int(StateID, SearchSpace &)> evaluator;
 

@@ -3,9 +3,14 @@
 
 #include <memory>
 #include <chrono> // for a more accurate timer
-#include "lookhead_search.h"
 #include "../utils/timer.h"
 #include "../search_engine.h" // for SearchStatus
+
+#include "kinds.h"
+#include "lookhead_search.h"
+#include "dijkstra_learning.h"
+#include "nancy_learning.h"
+#include "decision_strategy.h"
 
 namespace real_time
 {
@@ -13,16 +18,19 @@ namespace real_time
 // A lookahead bound is a certain type of bound imposed
 struct Bound;
 // Lookahead Control
-struct SearchControl;
+struct SearchCtrl;
 
-struct SearchControl
+struct SearchCtrl
 {
+	GlobalState const *cs;
 	std::unique_ptr<Bound> lb;
+	LookaheadSearchMethod lsm;
 	std::unique_ptr<LookaheadSearch> ls;
-	LearningMethod learning_method;
+	LearningMethod lm;
+	const bool h_before_learn;
 	std::unique_ptr<DijkstraLearning> dl;
 	std::unique_ptr<NancyLearning> nl;
-	DecisionStrategy decision_strategy_type;
+	DecisionStrategy ds;
 	std::unique_ptr<ScalarDecider> sd;
 	std::unique_ptr<DistributionDecider> dd;
 	// debug statistics.  this vector collects the number of
@@ -36,20 +44,20 @@ struct SearchControl
 	bool learning_done;
 
 	// TODO: allow in place construction maybe
-	LookaheadControl();
-	virtual ~LookaheadControl();
+	SearchCtrl(GlobalState const &s, LookaheadSearchMethod lsm, LearningMethod lm, DecisionStrategy ds);
+	virtual ~SearchCtrl();
 
 	void initialize(GlobalState const &s);
 	SearchStatus search();
 	void learn();
-	void act();
+	OperatorID select_action();
 
 	void print_statistics() const;
 };
 
 struct Bound
 {
-	virtual ~LookaheadBound() = default;
+	virtual ~Bound() = default;
 	virtual bool ok() const = 0;
 	virtual void initialize(LookaheadSearch const &ls) = 0;
 };
@@ -59,8 +67,8 @@ struct MaxExpansions : Bound
 	SearchStatistics const *stats;
 	int bound;
 
-	ExpansionBound(int b);
-	virtual ~ExpansionBound() = default;
+	MaxExpansions(int b);
+	virtual ~MaxExpansions() = default;
 
 	bool ok() const final;
 	void initialize(LookaheadSearch const &ls) final;
@@ -82,8 +90,8 @@ struct MaxTime : Bound
 	const std::chrono::duration<int, std::milli> max_ms;
 	RtTimer timer;
 
-	TimeBound(int max_ms);
-	virtual ~TimeBound() = default;
+	MaxTime(int max_ms);
+	virtual ~MaxTime() = default;
 
 	bool ok() const final;
 	void initialize(LookaheadSearch const &ls) final;
