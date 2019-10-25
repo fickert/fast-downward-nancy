@@ -1,5 +1,8 @@
 #include "lookahead_control.h"
 
+#include <numeric>   // accumulate
+#include <algorithm> // sort
+
 // #define TRACKLC
 
 #ifdef TRACKLC
@@ -35,6 +38,7 @@ SearchStatus LookaheadControl::search()
 	while (lb->ok() && res == IN_PROGRESS) {
 		res = ls->step();
 	}
+	expansions.push_back(ls->get_statistics().get_expanded());
 	switch (res) {
 	case FAILED:        return FAILED;
 	case SOLVED:        return SOLVED;
@@ -43,6 +47,29 @@ SearchStatus LookaheadControl::search()
 	}
 
 	__builtin_unreachable();
+}
+
+void LookaheadControl::print_statistics() const
+{
+	ls->print_statistics();
+
+	// hack since I need to sort the vector and this is a const
+	// method.  this is fine though since the statistics are only
+	// printed once in the end, so moving the vector doesn't
+	// matter anymore.
+	auto v = std::move(expansions);
+	std::sort(v.begin(), v.end());
+	size_t s = v.size();
+	assert(s > 0);
+	int avg = std::accumulate(v.begin(), v.end(), 0) / s;
+	int min = v[0];
+	int max = v[s-1];
+	int med = ((s & 1) == 0) ? (v[(s/2)-1] + v[s/2]) / 2 : v[s/2];
+
+	std::cout << "Average number of expansions: " << avg << "\n"
+		  << "Minimum number of expansions: " << min << "\n"
+		  << "Maximum number of expansions: " << max << "\n"
+		  << "Median expansions: " << med << "\n";
 }
 
 ExpansionBound::ExpansionBound(int b): stats(nullptr), bound(b) {}

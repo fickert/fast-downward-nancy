@@ -263,7 +263,7 @@ void RealTimeSearch::print_statistics() const {
 			std::cout << "Average distance error: " << heuristic_error->get_average_distance_error() << std::endl;
 	}
 	std::cout << "Fallback to gaussian (decision strategy): " << gaussian_fallback_count << std::endl;
-	lc.ls->print_statistics();
+	lc.print_statistics();
 }
 
 static auto _parse(options::OptionParser &parser) -> std::shared_ptr<SearchEngine> {

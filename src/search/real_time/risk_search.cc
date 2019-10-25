@@ -72,10 +72,6 @@ ShiftedDistribution RiskLookaheadSearch::get_belief(EvaluationContext &eval_cont
   // if not, get the distribution associated with the state's features
   // and assign the state's belief to that.
   int h = eval_context.get_evaluator_value(base_heuristic.get());
-  if (static_cast<size_t>(h) >= raw_beliefs.size()) {
-    raw_beliefs.resize(h+1);
-    raw_post_beliefs.resize(h+1);
-  }
   DataFeature df(f_kind, h, ph);
   DiscreteDistribution *distribution = raw_beliefs.get_distribution(df);
   if (!distribution) {
@@ -621,7 +617,7 @@ RiskLookaheadSearch::RiskLookaheadSearch(StateRegistry &state_registry, int look
   tlas.reserve(32);
   applicables.reserve(32);
   state_owners.reserve(lookahead_bound);
-  assert(raw_beliefs.size() == 1 && raw_post_beliefs.size() == 1);
+  assert(raw_beliefs.size() > 0 && raw_post_beliefs.size() > 0);
 
   auto *dead_distribution = new DiscreteDistribution(1);
   // hack to make a distribution with one value at infinity

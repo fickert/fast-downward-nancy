@@ -22,6 +22,7 @@ struct LookaheadControl
 {
 	std::unique_ptr<LookaheadSearch> ls;
 	std::unique_ptr<LookaheadBound> lb;
+	std::vector<int> expansions;
 
 	// TODO: allow in place construction maybe
 	LookaheadControl();
@@ -29,6 +30,8 @@ struct LookaheadControl
 
 	void initialize(GlobalState const &s);
 	SearchStatus search();
+
+	void print_statistics() const;
 };
 
 struct ExpansionBound : LookaheadBound
