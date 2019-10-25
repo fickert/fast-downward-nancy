@@ -8,11 +8,11 @@
 
 namespace real_time {
 
-ScalarDecisionStrategy::ScalarDecisionStrategy(const StateRegistry &state_registry, decltype(evaluator) evaluator)
+ScalarDecider::ScalarDecider(const StateRegistry &state_registry, decltype(evaluator) evaluator)
 	: state_registry(state_registry),
 	  evaluator(evaluator) {}
 
-auto ScalarDecisionStrategy::get_top_level_action(const std::vector<StateID> &frontier, SearchSpace &search_space) const -> OperatorID {
+auto ScalarDecider::get_top_level_action(const std::vector<StateID> &frontier, SearchSpace &search_space) const -> OperatorID {
 	assert(!frontier.empty());
 	const auto best_state_id = std::min_element(std::begin(frontier), std::end(frontier), [this, &search_space](const auto &lhs, const auto &rhs) {
 		return evaluator(lhs, search_space) < evaluator(rhs, search_space);
@@ -24,7 +24,7 @@ auto ScalarDecisionStrategy::get_top_level_action(const std::vector<StateID> &fr
 }
 
 
-NancyDecisionStrategy::NancyDecisionStrategy(TLAs const *tlas,
+DistributionDecider::DistributionDecider(TLAs const *tlas,
                                              SearchEngine const &engine,
                                              StateRegistry const &state_registry,
                                              StateID dummy_id)
@@ -35,7 +35,7 @@ NancyDecisionStrategy::NancyDecisionStrategy(TLAs const *tlas,
 
 // beliefs from frontier are already backed up to tlas during expansion.
 // Now we just have to select the minimum expected among them.
-OperatorID NancyDecisionStrategy::pick_top_level_action(SearchSpace &search_space)
+OperatorID DistributionDecider::pick_top_level_action(SearchSpace &search_space)
 {
   //std::cout << "pick_top_level_action()\n";
 

@@ -7,7 +7,7 @@
 #include "expansion_delay.h"
 #include "heuristic_error.h"
 #include "lookhead_search.h"
-#include "lookahead_control.h"
+#include "search_ctrl.h"
 #include "../open_list.h"
 #include "../search_engine.h"
 
@@ -49,7 +49,7 @@ class RealTimeSearch : public SearchEngine {
 		NANCY,
 	};
 
-	enum class Bound
+	enum class BoundKind
 	{
 	 EXPANSIONS,
 	 TIME,
@@ -60,19 +60,7 @@ class RealTimeSearch : public SearchEngine {
 
 	const bool evaluate_heuristic_when_learning;
 
-	// std::unique_ptr<LookaheadSearch> lookahead_search;
-	LookaheadControl lc;
-	LearningMethod learning_method;
-	// C++ doesn't let me put the learning method classes into a union
-	// unfortunately, because of non-trivial types
-	std::unique_ptr<DijkstraLearning> dijkstra_learning;
-	std::unique_ptr<NancyLearning> nancy_learning;
-	DecisionStrategy decision_strategy_type;
-	std::unique_ptr<real_time::DecisionStrategy> decision_strategy;
-
-	// having a separate pointer makes it much nicer than inheritance in
-	// this case
-	std::unique_ptr<NancyDecisionStrategy> nancy_decision_strategy;
+	SearchControl sc;
 
 	std::shared_ptr<Evaluator> distance_heuristic;
 	std::unique_ptr<ExpansionDelay> expansion_delay;

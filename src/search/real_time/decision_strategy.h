@@ -16,26 +16,18 @@ namespace real_time {
 
 struct TLAs;
 
-class DecisionStrategy {
-public:
-	DecisionStrategy() = default;
-	virtual ~DecisionStrategy() = default;
-
-	virtual auto get_top_level_action(const std::vector<StateID> &frontier, SearchSpace &search_space) const -> OperatorID = 0;
-};
-
-class ScalarDecisionStrategy : public DecisionStrategy {
+class ScalarDecider {
 	const StateRegistry &state_registry;
 	std::function<int(StateID, SearchSpace &)> evaluator;
 
 public:
-	ScalarDecisionStrategy(const StateRegistry &state_registry, decltype(evaluator) evaluator);
-	~ScalarDecisionStrategy() override = default;
+	ScalarDecider(const StateRegistry &state_registry, decltype(evaluator) evaluator);
+	~ScalarDecider() {}
 
-	auto get_top_level_action(const std::vector<StateID> &frontier, SearchSpace &search_space) const -> OperatorID override;
+	auto get_top_level_action(const std::vector<StateID> &frontier, SearchSpace &search_space) const -> OperatorID;
 };
 
-class NancyDecisionStrategy
+class DistributionDecider
 {
   // using Predecessors = std::unordered_map<StateID, std::vector<std::pair<StateID, OperatorProxy>>>;
   // using Beliefs = PerStateInformation<ShiftedDistribution>;
@@ -52,11 +44,11 @@ class NancyDecisionStrategy
   StateID target_state_id;
 
 public:
-	NancyDecisionStrategy(TLAs const *tlas,
+	DistributionDecider(TLAs const *tlas,
                         SearchEngine const &engine,
                         StateRegistry const &state_registry,
                         StateID dummy_id);
-	~NancyDecisionStrategy() = default;
+	~DistributionDecider() = default;
   OperatorID pick_top_level_action(SearchSpace &search_space);
 
 };

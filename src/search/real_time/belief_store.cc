@@ -1,6 +1,6 @@
 #include "belief_store.h"
 
-#define TRACKBLF
+// #define TRACKBLF
 
 #ifdef TRACKBLF
 #define BEGINF(X) std::cout << "BLF: ENTER: " << X << "\n";

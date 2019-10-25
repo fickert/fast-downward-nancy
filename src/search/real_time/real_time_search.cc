@@ -76,11 +76,11 @@ RealTimeSearch::RealTimeSearch(const options::Options &opts)
 	}
 
 	std::cout << "initializing lookahead termination condition\n";
-	switch (Bound(opts.get_enum("rtbound_type"))) {
-	case Bound::EXPANSIONS:
+	switch (BoundKind(opts.get_enum("rtbound_type"))) {
+	case BoundKind::EXPANSIONS:
 		lc.lb = std::make_unique<ExpansionBound>(opts.get<int>("lookahead_bound"));
 		break;
-	case Bound::TIME:
+	case BoundKind::TIME:
 		lc.lb = std::make_unique<TimeBound>(opts.get<int>("time_bound"));
 		break;
 	}
@@ -88,19 +88,22 @@ RealTimeSearch::RealTimeSearch(const options::Options &opts)
 	std::cout << "initializing learning method\n";
 	switch (learning_method) {
 	case LearningMethod::NONE:
-		dijkstra_learning = nullptr;
+		sc.dl = nullptr;
+		sc.nl = nullptr;
 		break;
 	case LearningMethod::DIJKSTRA:
-		dijkstra_learning = std::make_unique<DijkstraLearning>(
+		sc.dl = std::make_unique<DijkstraLearning>(
 			std::static_pointer_cast<LearningEvaluator>(heuristic),
 			std::static_pointer_cast<LearningEvaluator>(distance_heuristic),
 			state_registry,
 			this);
+		sc.nl = nullptr;
 		break;
 	case LearningMethod::NANCY:
+		sc.dl = nullptr;
 		auto beliefs = lc.ls->get_beliefs();
 		auto post_beliefs = lc.ls->get_post_beliefs();
-		nancy_learning = std::make_unique<NancyLearning>(state_registry, this, beliefs, post_beliefs);
+		sc.nl = std::make_unique<NancyLearning>(state_registry, this, beliefs, post_beliefs);
 		break;
 	}
 
@@ -109,31 +112,33 @@ RealTimeSearch::RealTimeSearch(const options::Options &opts)
 	switch (decision_strategy_type) {
 	case DecisionStrategy::MINIMIN: {
 		auto f_evaluator = std::make_shared<sum_evaluator::SumEvaluator>(std::vector<std::shared_ptr<Evaluator>>{heuristic, std::make_shared<g_evaluator::GEvaluator>()});
-		decision_strategy = std::make_unique<ScalarDecisionStrategy>(state_registry,
+		sc.sd = std::make_unique<ScalarDecider>(state_registry,
 			[this, f_evaluator](const StateID &state_id, SearchSpace &lookahead_search_space) {
 				const auto state = state_registry.lookup_state(state_id);
 				const auto node = lookahead_search_space.get_node(state);
 				auto eval_context = EvaluationContext(state, node.get_g(), false, nullptr, false);
 				return eval_context.get_evaluator_value_or_infinity(f_evaluator.get());
 			});
+		sc.dd = nullptr;
 		break;
 	}
 	case DecisionStrategy::BELLMAN: {
 		auto f_hat_evaluator = create_f_hat_evaluator(heuristic, distance_heuristic, *heuristic_error);
-		decision_strategy = std::make_unique<ScalarDecisionStrategy>(state_registry,
+		sc.sd = std::make_unique<ScalarDecider>(state_registry,
 			[this, f_hat_evaluator](const StateID &state_id, SearchSpace &lookahead_search_space) {
 				const auto state = state_registry.lookup_state(state_id);
 				const auto node = lookahead_search_space.get_node(state);
 				auto eval_context = EvaluationContext(state, node.get_g(), false, nullptr, false);
 				return eval_context.get_evaluator_value_or_infinity(f_hat_evaluator.get());
 			});
+		sc.dd = nullptr;
 		break;
 	}
 	case DecisionStrategy::NANCY: {
 		auto const tlas = this->lc.ls->get_tlas();
 		assert(tlas);
-		nancy_decision_strategy = std::make_unique<NancyDecisionStrategy>(tlas, *this, state_registry, current_state.get_id());
-		decision_strategy = nullptr;
+		sc.sd = nullptr;
+		sc.dd = std::make_unique<DistributionDecider>(tlas, *this, state_registry, current_state.get_id());
 		break;
 	}
 	default:
@@ -219,37 +224,15 @@ SearchStatus RealTimeSearch::step() {
 		return FAILED;
 
 	TRACKP("learning/backup");
-	switch (learning_method) {
-	case LearningMethod::NONE:
-		break;
-	case LearningMethod::DIJKSTRA:
-		dijkstra_learning->apply_updates(lc.ls->get_predecessors(), lc.ls->get_frontier(), lc.ls->get_closed(), evaluate_heuristic_when_learning);
-		break;
-	case LearningMethod::NANCY:
-		nancy_learning->apply_updates(lc.ls->get_predecessors(), lc.ls->get_frontier(), lc.ls->get_closed(), current_state);
-		break;
-	}
+	// TODO: check if it makes a difference to select the action
+	// before learning (I don't think it does).  Then we could
+	// learn later, and be safer with respect to the time
+	// deadline.
+	lc.learn();
 
 	TRACKP("action selection");
-	OperatorID best_top_level_action(0);
-	switch (decision_strategy_type) {
-	case DecisionStrategy::NANCY:
-		assert(nancy_decision_strategy);
-		best_top_level_action = nancy_decision_strategy->pick_top_level_action(lc.ls->get_search_space());
-		break;
-	default:
-		best_top_level_action = decision_strategy->get_top_level_action(lc.ls->get_frontier(), lc.ls->get_search_space());
-		break;
-	}
-	//const auto best_top_level_action = decision_strategy->get_top_level_action(lc.ls->get_frontier(), lc.ls->get_search_space());
-	const auto parent_node = search_space.get_node(current_state);
-	const auto op = task_proxy.get_operators()[best_top_level_action];
-	solution_cost += get_adjusted_cost(op);
-	// std::cout << "executing action " << op.get_name() << " with cost " << get_adjusted_cost(op) << "\n";
-	current_state = state_registry.get_successor_state(current_state, op);
-	auto next_node = search_space.get_node(current_state);
-	if (next_node.is_new())
-		next_node.open(parent_node, op, get_adjusted_cost(op));
+	lc.act();
+
 	return IN_PROGRESS;
 }
 
