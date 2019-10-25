@@ -193,7 +193,7 @@ void RiskLookaheadSearch::initialize(const GlobalState &initial_state)
 	EvaluationContext root_eval_context = EvaluationContext(initial_state, 0, false, statistics.get());
 	int root_h = root_eval_context.get_evaluator_value_or_infinity(heuristic.get());
 
-	std::cout << "looking from " << cur_state_id <<  ", h_hat: " << beliefs[initial_state].expected_cost() << "\n";
+	TRACKP("looking from " << cur_state_id <<  ", h_hat: " << beliefs[initial_state].expected_cost() << "\n");
 
 	for (auto op_id : applicables) {
 		auto const op = task_proxy.get_operators()[op_id];
