@@ -6,6 +6,11 @@
 #include "../task_utils/task_properties.h"
 #include "../utils/system.h"
 #include "util.h"
+#include "learning_evaluator.h"
+#include "max_time.h"
+#include "max_expansions.h"
+#include "nancy_backup.h"
+#include "dijkstra_backup.h"
 #include "belief_data.h"
 #include "DiscreteDistribution.h"
 #include "state_collector.h"
@@ -35,7 +40,7 @@ RealTimeSearch::RealTimeSearch(const options::Options &opts)
 	  gaussian_fallback_count(0),
 	  sc(current_state,
 	     LookaheadSearchMethod(opts.get_enum("lookahead_search")),
-	     LearningMethod(opts.get_enum("learning")),
+	     BackupMethod(opts.get_enum("learning")),
 	     DecisionStrategy(opts.get_enum("decision_strategy")))
 {
   BEGINF(__func__);
@@ -48,11 +53,11 @@ RealTimeSearch::RealTimeSearch(const options::Options &opts)
 
 	heuristic = opts.get<std::shared_ptr<Evaluator>>("h");
 	base_heuristic = heuristic;
-	if (sc.lm == LearningMethod::DIJKSTRA)
+	if (sc.lm == BackupMethod::DIJKSTRA)
 		heuristic = std::make_shared<LearningEvaluator>(heuristic);
 	initialize_optional_features(opts);
 
-	bool const store_exploration_data = sc.lm != LearningMethod::NONE;
+	bool const store_exploration_data = sc.lm != BackupMethod::NONE;
 	//bool const store_exploration_data = true;
 
 	std::cout << "initializing lookahead method\n";
@@ -89,23 +94,16 @@ RealTimeSearch::RealTimeSearch(const options::Options &opts)
 
 	std::cout << "initializing learning method\n";
 	switch (sc.lm) {
-	case LearningMethod::NONE:
-		sc.dl = nullptr;
-		sc.nl = nullptr;
+	case BackupMethod::NONE:
+		sc.le = nullptr;
 		break;
-	case LearningMethod::DIJKSTRA:
-		sc.dl = std::make_unique<DijkstraLearning>(
-			std::static_pointer_cast<LearningEvaluator>(heuristic),
-			std::static_pointer_cast<LearningEvaluator>(distance_heuristic),
-			state_registry,
-			this);
-		sc.nl = nullptr;
+	case BackupMethod::DIJKSTRA:
+		assert(false);
 		break;
-	case LearningMethod::NANCY:
-		sc.dl = nullptr;
+	case BackupMethod::NANCY:
 		auto beliefs = sc.ls->get_beliefs();
 		auto post_beliefs = sc.ls->get_post_beliefs();
-		sc.nl = std::make_unique<NancyLearning>(state_registry, this, beliefs, post_beliefs);
+		sc.le = std::make_unique<NancyBackup>(state_registry, this, beliefs, post_beliefs);
 		break;
 	}
 
@@ -160,7 +158,7 @@ void RealTimeSearch::initialize_optional_features(const options::Options &opts) 
 			distance_heuristic = heuristic;
 		} else {
 			distance_heuristic = opts.get<std::shared_ptr<Evaluator>>("distance_heuristic");
-			if (sc.lm == LearningMethod::DIJKSTRA)
+			if (sc.lm == BackupMethod::DIJKSTRA)
 				distance_heuristic = std::make_shared<LearningEvaluator>(distance_heuristic);
 		}
 		heuristic_error = std::make_unique<HeuristicError>(state_registry, heuristic, distance_heuristic);
@@ -194,7 +192,7 @@ void RealTimeSearch::initialize() {
 
 SearchStatus RealTimeSearch::step() {
 	++num_rts_phases;
-	sc.initialize(current_state);
+	sc.initialize_lookahead(current_state);
 	TRACKP("doing lookahead");
 	const auto status = sc.search();
 	TRACKP("finished lookahead");
@@ -225,20 +223,17 @@ SearchStatus RealTimeSearch::step() {
 	if (sc.ls->get_frontier().empty())
 		return FAILED;
 
-	TRACKP("learning/backup");
-	// TODO: check if it makes a difference to select the action
-	// before learning (I don't think it does).  Then we could
-	// learn later, and be safer with respect to the time
-	// deadline.
-	sc.learn();
-
 	TRACKP("action selection");
 	OperatorID best_tla = sc.select_action();
 
+	TRACKP("learning/backup");
+	sc.initialize_learning();
+	sc.learn();
+
+	TRACKP("execution");
 	const auto parent_node = search_space.get_node(current_state);
 	const auto op = task_proxy.get_operators()[best_tla];
 	solution_cost += get_adjusted_cost(op);
-	// std::cout << "executing action " << op.get_name() << " with cost " << get_adjusted_cost(op) << "\n";
 	current_state = state_registry.get_successor_state(current_state, op);
 	auto next_node = search_space.get_node(current_state);
 	if (next_node.is_new())

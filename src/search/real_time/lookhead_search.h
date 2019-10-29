@@ -80,12 +80,14 @@ public:
 	auto get_search_space() const -> SearchSpace & { return *search_space.get(); }
 	auto get_frontier() const -> const decltype(frontier) & { return frontier; }
 	auto get_predecessors() const -> const decltype(predecessors) & { return predecessors; }
-	auto get_closed() const -> const decltype(closed) & { return closed; }
+	// this is consumed during learning.  that's fine, no one else
+	// needs this.
+	auto get_closed() -> decltype(closed) & { return closed; }
 
-  // only implemented for lookahead search methods making use of distributions (risk)
-  virtual auto get_tlas() -> TLAs const * { return nullptr; }
-  virtual auto get_beliefs() -> PerStateInformation<ShiftedDistribution> * { return nullptr; }
-  virtual auto get_post_beliefs() -> PerStateInformation<ShiftedDistribution> * { return nullptr; }
+	// only implemented for lookahead search methods making use of distributions (risk)
+	virtual auto get_tlas() -> TLAs const * { return nullptr; }
+	virtual auto get_beliefs() -> PerStateInformation<ShiftedDistribution> * { return nullptr; }
+	virtual auto get_post_beliefs() -> PerStateInformation<ShiftedDistribution> * { return nullptr; }
 };
 
 class EagerLookaheadSearch : public LookaheadSearch {

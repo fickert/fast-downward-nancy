@@ -18,15 +18,13 @@
 namespace real_time
 {
 
-SearchCtrl::SearchCtrl(GlobalState const &s, LookaheadSearchMethod lsm, LearningMethod lm, DecisionStrategy ds)
+SearchCtrl::SearchCtrl(GlobalState const &s, LookaheadSearchMethod lsm, BackupMethod lm, DecisionStrategy ds)
 	: cs(&s),
 	  lb(nullptr),
 	  lsm(lsm),
 	  ls(nullptr),
 	  lm(lm),
-	  h_before_learn(lsm == LookaheadSearchMethod::BREADTH_FIRST),
-	  dl(nullptr),
-	  nl(nullptr),
+	  le(nullptr),
 	  ds(ds),
 	  sd(nullptr),
 	  dd(nullptr),
@@ -34,27 +32,32 @@ SearchCtrl::SearchCtrl(GlobalState const &s, LookaheadSearchMethod lsm, Learning
 {}
 SearchCtrl::~SearchCtrl() {}
 
-void SearchCtrl::initialize(GlobalState const &s)
+void SearchCtrl::initialize_lookahead(GlobalState const &s)
 {
 	cs = &s;
 	BEGINF(__func__);
 	ls->initialize(s);
 	assert(lb != nullptr);
-	// TODO: implement a way here to make a choice how long we'll
-	// do look-ahead. based on how much time one iteration takes
-	// at most.
 	lb->initialize(*ls);
 	ENDF(__func__)
 }
 
+void SearchCtrl::initialize_learning()
+{
+	BEGINF(__func__);
+	le->initialize(ls->get_predecessors(), ls->get_frontier(), ls->get_closed());
+	ENDF(__func__)
+}
 
 SearchStatus SearchCtrl::search()
 {
 	BEGINF(__func__);
-	// TODO: check flag if we need to finish learning from
-	// previous iteration first.
+	if (!learning_done) {
+		// TODO: implement
+	}
+
 	SearchStatus res = IN_PROGRESS;
-	while (lb->ok() && res == IN_PROGRESS) {
+	while (lb->lookahead_ok() && res == IN_PROGRESS) {
 		res = ls->step();
 	}
 	expansions.push_back(ls->get_statistics().get_expanded());
@@ -71,13 +74,21 @@ SearchStatus SearchCtrl::search()
 
 void SearchCtrl::learn()
 {
-	// TODO: make learning steppable, interupt if out of time and set the
-	// flag to continue learning next iteration
-	switch (lm) {
-	case LearningMethod::NONE: break;
-	case LearningMethod::DIJKSTRA: dl->apply_updates(ls->get_predecessors(), ls->get_frontier(), ls->get_closed(), h_before_learn); break;
-	case LearningMethod::NANCY:    nl->apply_updates(ls->get_predecessors(), ls->get_frontier(), ls->get_closed(), *cs); break;
+	auto effort = le->effort();
+	while (lb->learning_ok() && !le->done()) {
+		le->step();
 	}
+	learning_done = le->done();
+	auto remaining = le->remaining();
+
+	auto done = effort - remaining;
+	if (0 == done) {
+		TRACKP("didn't finish a single entry during learning");
+	} else {
+		TRACKP("in learning remained " << remaining << " out of " << effort);
+	}
+
+	lb->adjust_learning(effort, remaining);
 }
 
 OperatorID SearchCtrl::select_action()
@@ -86,70 +97,6 @@ OperatorID SearchCtrl::select_action()
 	case DecisionStrategy::NANCY: return dd->pick_top_level_action(ls->get_search_space()); break;
 	default:                      return sd->get_top_level_action(ls->get_frontier(), ls->get_search_space());   break;
 	}
-}
-
-MaxExpansions::MaxExpansions(int b): stats(nullptr), bound(b) {}
-
-bool MaxExpansions::ok() const
-{
-	assert(stats != nullptr);
-	return stats->get_expanded() < bound;
-}
-
-void MaxExpansions::initialize(LookaheadSearch const &ls)
-{
-	stats = &ls.get_statistics();
-	assert(stats->get_expanded() == 1);
-}
-
-
-
-RtTimer::RtTimer() {}
-RtTimer::~RtTimer() {}
-
-// uint64 rdtsc() {
-// 	uint32_t hi, lo;
-// 	__asm__ __volatile__ ("rdtsc" : "=a" (lo), "=d" (hi));
-// 	return ((uint64_t) hi << 32 | lo;
-// }
-
-std::chrono::duration<int, std::milli> RtTimer::diff() const
-{
-	auto d = (std::chrono::system_clock::now() - start);
-	return std::chrono::duration_cast<std::chrono::milliseconds>(d);
-}
-
-void RtTimer::reset()
-{
-	BEGINF(__func__);
-	start = std::chrono::system_clock::now();
-	ENDF(__func__);
-}
-
-
-MaxTime::MaxTime(int ms) : max_ms(std::chrono::duration<int, std::milli>(ms)) {BEGINF(__func__); ENDF(__func__);}
-
-bool MaxTime::ok() const
-{
-	// BEGINF(__func__);
-	// auto d = timer.diff();
-	// if (d >= max_ms) {
-	// 	ENDF(__func__);
-	// 	std::cout << "stopped lookahead after " << d.count() << "\n";
-	// 	return false;
-	// } else {
-	// 	ENDF(__func__);
-	// 	return true;
-	// }
-	return timer.diff() < max_ms;
-}
-
-void MaxTime::initialize(LookaheadSearch const &ls)
-{
-	BEGINF(__func__);
-	(void)&ls;
-	timer.reset();
-	ENDF(__func__);
 }
 
 void SearchCtrl::prepare_statistics()

@@ -4,7 +4,7 @@
 namespace real_time
 {
 
-enum class LearningMethod
+enum class BackupMethod
 {
  NONE,
  DIJKSTRA,

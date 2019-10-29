@@ -3,8 +3,7 @@
 
 #include "kinds.h"
 #include "decision_strategy.h"
-#include "dijkstra_learning.h"
-#include "nancy_learning.h"
+#include "learning.h"
 #include "expansion_delay.h"
 #include "heuristic_error.h"
 #include "lookhead_search.h"
