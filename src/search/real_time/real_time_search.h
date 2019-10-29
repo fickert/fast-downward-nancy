@@ -2,11 +2,8 @@
 #define REAL_TIME_REAL_TIME_SEARCH_H
 
 #include "kinds.h"
-#include "decision_strategy.h"
-#include "learning.h"
 #include "expansion_delay.h"
 #include "heuristic_error.h"
-#include "lookhead_search.h"
 #include "search_ctrl.h"
 #include "../open_list.h"
 #include "../search_engine.h"

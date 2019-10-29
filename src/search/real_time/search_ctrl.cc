@@ -26,8 +26,7 @@ SearchCtrl::SearchCtrl(GlobalState const &s, LookaheadSearchMethod lsm, BackupMe
 	  lm(lm),
 	  le(nullptr),
 	  ds(ds),
-	  sd(nullptr),
-	  dd(nullptr),
+	  dec(nullptr),
 	  learning_done(true)
 {}
 SearchCtrl::~SearchCtrl() {}
@@ -93,10 +92,7 @@ void SearchCtrl::learn()
 
 OperatorID SearchCtrl::select_action()
 {
-	switch (ds) {
-	case DecisionStrategy::NANCY: return dd->pick_top_level_action(ls->get_search_space()); break;
-	default:                      return sd->get_top_level_action(ls->get_frontier(), ls->get_search_space());   break;
-	}
+	return dec->decide(ls->get_frontier(), ls->get_search_space());
 }
 
 void SearchCtrl::prepare_statistics()

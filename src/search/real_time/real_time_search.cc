@@ -11,6 +11,8 @@
 #include "max_expansions.h"
 #include "nancy_backup.h"
 #include "dijkstra_backup.h"
+#include "scalar_decider.h"
+#include "dist_decider.h"
 #include "belief_data.h"
 #include "DiscreteDistribution.h"
 #include "state_collector.h"
@@ -111,33 +113,30 @@ RealTimeSearch::RealTimeSearch(const options::Options &opts)
 	switch (sc.ds) {
 	case DecisionStrategy::MINIMIN: {
 		auto f_evaluator = std::make_shared<sum_evaluator::SumEvaluator>(std::vector<std::shared_ptr<Evaluator>>{heuristic, std::make_shared<g_evaluator::GEvaluator>()});
-		sc.sd = std::make_unique<ScalarDecider>(state_registry,
+		sc.dec = std::make_unique<ScalarDecider>(state_registry,
 			[this, f_evaluator](const StateID &state_id, SearchSpace &lookahead_search_space) {
 				const auto state = state_registry.lookup_state(state_id);
 				const auto node = lookahead_search_space.get_node(state);
 				auto eval_context = EvaluationContext(state, node.get_g(), false, nullptr, false);
 				return eval_context.get_evaluator_value_or_infinity(f_evaluator.get());
 			});
-		sc.dd = nullptr;
 		break;
 	}
 	case DecisionStrategy::BELLMAN: {
 		auto f_hat_evaluator = create_f_hat_evaluator(heuristic, distance_heuristic, *heuristic_error);
-		sc.sd = std::make_unique<ScalarDecider>(state_registry,
+		sc.dec = std::make_unique<ScalarDecider>(state_registry,
 			[this, f_hat_evaluator](const StateID &state_id, SearchSpace &lookahead_search_space) {
 				const auto state = state_registry.lookup_state(state_id);
 				const auto node = lookahead_search_space.get_node(state);
 				auto eval_context = EvaluationContext(state, node.get_g(), false, nullptr, false);
 				return eval_context.get_evaluator_value_or_infinity(f_hat_evaluator.get());
 			});
-		sc.dd = nullptr;
 		break;
 	}
 	case DecisionStrategy::NANCY: {
 		auto const tlas = this->sc.ls->get_tlas();
 		assert(tlas);
-		sc.sd = nullptr;
-		sc.dd = std::make_unique<DistributionDecider>(tlas, *this, state_registry, current_state.get_id());
+		sc.dec = std::make_unique<DistributionDecider>(state_registry, tlas, *this, current_state.get_id());
 		break;
 	}
 	default:

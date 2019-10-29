@@ -9,7 +9,7 @@
 #include "bound.h"
 #include "lookhead_search.h"
 #include "learning.h"
-#include "decision_strategy.h"
+#include "decision.h"
 
 namespace real_time
 {
@@ -28,8 +28,7 @@ struct SearchCtrl
 	BackupMethod lm;
 	std::unique_ptr<Learning> le;
 	DecisionStrategy ds;
-	std::unique_ptr<ScalarDecider> sd;
-	std::unique_ptr<DistributionDecider> dd;
+	std::unique_ptr<Decision> dec;
 	// debug statistics.  this vector collects the number of
 	// expansions in each lookahead phase.  interesting to look at
 	// when a time bound is used.
