@@ -226,8 +226,7 @@ SearchStatus RealTimeSearch::step() {
 	OperatorID best_tla = sc.select_action();
 
 	TRACKP("learning/backup");
-	sc.initialize_learning();
-	sc.learn();
+	sc.learn_initial();
 
 	TRACKP("execution");
 	const auto parent_node = search_space.get_node(current_state);

@@ -10,7 +10,9 @@
 #include "../state_registry.h"
 #include "../task_utils/successor_generator.h"
 #include "DiscreteDistribution.h"
+#include "lap_timer.h"
 
+#include <chrono>
 #include <memory>
 #include <vector>
 #include <unordered_set>
@@ -30,6 +32,7 @@ protected:
 	StateRegistry &state_registry;
 	const successor_generator::SuccessorGenerator &successor_generator;
 	std::unique_ptr<SearchStatistics> statistics;
+	LapTimer lt;
 
 	SearchEngine const *search_engine; // to call get_adjusted_cost
 	std::unique_ptr<SearchSpace> search_space;
@@ -80,6 +83,7 @@ public:
 	auto get_search_space() const -> SearchSpace & { return *search_space.get(); }
 	auto get_frontier() const -> const decltype(frontier) & { return frontier; }
 	auto get_predecessors() const -> const decltype(predecessors) & { return predecessors; }
+	auto get_duration() const -> std::chrono::milliseconds { return lt.get(); }
 	// this is consumed during learning.  that's fine, no one else
 	// needs this.
 	auto get_closed() -> decltype(closed) & { return closed; }

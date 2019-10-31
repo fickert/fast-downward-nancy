@@ -15,7 +15,7 @@ struct MaxExpansions : Bound
 	MaxExpansions(int b);
 	virtual ~MaxExpansions() = default;
 
-	bool lookahead_ok() const final;
+	bool lookahead_ok() final;
 	bool learning_ok() const final;
 	void initialize(LookaheadSearch const &ls) final;
 	void adjust_learning(size_t effort, size_t remaining) final;

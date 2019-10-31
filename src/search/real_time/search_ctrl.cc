@@ -2,6 +2,9 @@
 
 #include <numeric>   // accumulate
 #include <algorithm> // sort
+#include <chrono>    // the search control itself also measures time
+
+#include "lap_timer.h"
 
 // #define TRACKSC
 
@@ -33,6 +36,11 @@ SearchCtrl::~SearchCtrl() {}
 
 void SearchCtrl::initialize_lookahead(GlobalState const &s)
 {
+	if (!learning_done) {
+		TRACKP("finishing learning from before");
+		learn_catch_up();
+	}
+
 	cs = &s;
 	BEGINF(__func__);
 	ls->initialize(s);
@@ -41,19 +49,9 @@ void SearchCtrl::initialize_lookahead(GlobalState const &s)
 	ENDF(__func__)
 }
 
-void SearchCtrl::initialize_learning()
-{
-	BEGINF(__func__);
-	le->initialize(ls->get_predecessors(), ls->get_frontier(), ls->get_closed());
-	ENDF(__func__)
-}
-
 SearchStatus SearchCtrl::search()
 {
 	BEGINF(__func__);
-	if (!learning_done) {
-		// TODO: implement
-	}
 
 	SearchStatus res = IN_PROGRESS;
 	while (lb->lookahead_ok() && res == IN_PROGRESS) {
@@ -71,21 +69,27 @@ SearchStatus SearchCtrl::search()
 }
 
 
-void SearchCtrl::learn()
+void SearchCtrl::learn_catch_up()
 {
+	while (lb->learning_ok() && !le->done()) {
+		le->step();
+	}
+}
+
+void SearchCtrl::learn_initial()
+{
+	// build up the learning queue
+	le->initialize(ls->get_predecessors(), ls->get_frontier(), ls->get_closed());
+
+	// estimate how much we have to do
 	auto effort = le->effort();
+	// do it
 	while (lb->learning_ok() && !le->done()) {
 		le->step();
 	}
 	learning_done = le->done();
 	auto remaining = le->remaining();
 
-	auto done = effort - remaining;
-	if (0 == done) {
-		TRACKP("didn't finish a single entry during learning");
-	} else {
-		TRACKP("in learning remained " << remaining << " out of " << effort);
-	}
 
 	lb->adjust_learning(effort, remaining);
 }

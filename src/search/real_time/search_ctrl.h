@@ -39,14 +39,13 @@ struct SearchCtrl
 	// the lookahead phase.
 	bool learning_done;
 
-	// TODO: allow in place construction maybe
 	SearchCtrl(GlobalState const &s, LookaheadSearchMethod lsm, BackupMethod lm, DecisionStrategy ds);
 	virtual ~SearchCtrl();
 
 	void initialize_lookahead(GlobalState const &s);
-	void initialize_learning();
 	SearchStatus search();
-	void learn();
+	void learn_initial();
+	void learn_catch_up();
 	OperatorID select_action();
 
 	void prepare_statistics();

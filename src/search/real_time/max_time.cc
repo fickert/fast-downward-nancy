@@ -22,14 +22,17 @@ MaxTime::MaxTime(int ms)
 	: start(std::chrono::system_clock::now()),
 	  max_ms(ms),
 	  final_bound(start + max_ms),
-	  lookahead_part(99),
+	  lookahead_part(95),
 	  lookahead_ms(ms * lookahead_part / 100),
-	  lookahead_bound(start + lookahead_ms)
+	  lookahead_bound(start + lookahead_ms),
+	  ls(nullptr),
+	  lookahead_ub(1) //assume lookahead always takes at least one ms
 {}
 
-bool MaxTime::lookahead_ok() const
+bool MaxTime::lookahead_ok()
 {
-	return std::chrono::system_clock::now() < lookahead_bound;
+	lookahead_ub = std::max(lookahead_ub, ls->get_duration());
+	return (std::chrono::system_clock::now() + lookahead_ub) < lookahead_bound;
 }
 
 bool MaxTime::learning_ok() const
@@ -40,7 +43,7 @@ bool MaxTime::learning_ok() const
 void MaxTime::initialize(LookaheadSearch const &ls)
 {
 	BEGINF(__func__);
-	(void)&ls;
+	this->ls = &ls;
 	start = final_bound;
 	final_bound = start + max_ms;
 	// Note that lookahead_ms might have changed in adjust_learning
@@ -79,12 +82,20 @@ void MaxTime::adjust_learning(size_t effort, size_t remaining)
 {
 	auto done = effort - remaining;
 	auto learn_ms = max_ms - lookahead_ms;
+
+	if (0 == done) {
+		TRACKP("didn't finish a single entry during learning");
+	} else {
+		TRACKP("in learning remained " << remaining << " out of " << effort);
+	}
+
+
 	if (0 == remaining) {
 		auto n = std::chrono::system_clock::now();
 		assert(final_bound > n);
 		// this would indicate a massive waste of time in the learning phase.
 		if (2 * (final_bound - n) >= learn_ms) {
-			auto new_learn_ms = std::max(std::chrono::duration<int, std::milli>(1),(learn_ms/2)+(learn_ms/4));
+			auto new_learn_ms = std::max(std::chrono::milliseconds{1},(learn_ms/2)+(learn_ms/4));
 			auto new_lookahead_ms = max_ms - new_learn_ms;
 			TRACKP("Decreasing the learning ms from " << learn_ms.count() << " to " << new_learn_ms.count() << ".  Increasing lookahead ms from " << lookahead_ms.count() << " to " << new_lookahead_ms.count());
 			this->lookahead_ms = new_lookahead_ms;

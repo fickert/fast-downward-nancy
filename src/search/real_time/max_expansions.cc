@@ -16,7 +16,7 @@ namespace real_time
 
 MaxExpansions::MaxExpansions(int b): stats(nullptr), bound(b) {}
 
-bool MaxExpansions::lookahead_ok() const
+bool MaxExpansions::lookahead_ok()
 {
 	assert(stats != nullptr);
 	return stats->get_expanded() <= bound;

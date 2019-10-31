@@ -781,6 +781,7 @@ fast_downward_plugin(
         real_time/lookhead_search
 	real_time/bound
 	real_time/max_expansions
+	real_time/lap_timer
         real_time/max_time
 	real_time/search_ctrl
         real_time/state_collector
