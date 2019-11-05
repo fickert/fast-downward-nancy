@@ -3,6 +3,9 @@
 #include "../plugin.h"
 #include "../utils/system.h"
 #include "util.h"
+#include <algorithm>
+#include <execution> // for execution::seq
+#include <numeric> // for reduce
 
 #include <iostream>
 
@@ -34,6 +37,29 @@ void RealTimeSearch::print_statistics() const {
 		std::cout << "Average heuristic error: " << heuristic_error->get_average_heuristic_error() << std::endl;
 		if (distance_heuristic)
 			std::cout << "Average distance error: " << heuristic_error->get_average_distance_error() << std::endl;
+	}
+	if (hstar_data) {
+		auto num_entries = hstar_data->data.size();
+		std::vector<size_t> v;
+		v.reserve(num_entries);
+		// std::cout << "number of samples:\n";
+		// for (const auto a : hstar_data->data) {
+		// 	size_t tmp = 0;
+		// 	for (auto b : a.values) {
+		// 		tmp += b.hstar_values.size();
+		// 	}
+		// 	v.push_back(tmp);
+		// 	std::cout << tmp << '\n';
+		// }
+		std::sort(v.begin(), v.end());
+		auto avg = std::reduce(std::execution::seq, v.begin(), v.end(), 0, [](auto a, auto b) {return a + b;}) / num_entries;
+		auto min = v[0];
+		auto max = v[v.size()-1];
+		auto med = ((v.size() & 1) == 0) ? (v[v.size()/2-1]+v[v.size()/2])/2:v[v.size()/2];
+		std::cout << "Average number of samples: " << avg << "\n"
+			  << "Minimum number of samples: " << min << "\n"
+			  << "Maximum number of samples: " << max << "\n"
+			  << "Median number of samples: " << med << "\n";
 	}
 	std::cout << "Fallback to gaussian (decision strategy): " << gaussian_fallback_count << std::endl;
 	// ugly hack because the method is const, but i just want to
