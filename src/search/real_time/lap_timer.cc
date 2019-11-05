@@ -4,6 +4,7 @@ namespace real_time
 {
 
 LapTimer::LapTimer()
+	: cache(1)
 {
 }
 

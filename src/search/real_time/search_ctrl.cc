@@ -55,7 +55,9 @@ SearchStatus SearchCtrl::search()
 
 	SearchStatus res = IN_PROGRESS;
 	while (lb->lookahead_ok() && res == IN_PROGRESS) {
+		ls->next_lap();
 		res = ls->step();
+		ls->stop_lap();
 	}
 	expansions.push_back(ls->get_statistics().get_expanded());
 	switch (res) {
@@ -78,20 +80,18 @@ void SearchCtrl::learn_catch_up()
 
 void SearchCtrl::learn_initial()
 {
+	BEGINF(__func__);
 	// build up the learning queue
+	TRACKP("initializing learning queue");
 	le->initialize(ls->get_predecessors(), ls->get_frontier(), ls->get_closed());
 
-	// estimate how much we have to do
-	auto effort = le->effort();
 	// do it
+	TRACKP("doing learning");
 	while (lb->learning_ok() && !le->done()) {
 		le->step();
 	}
 	learning_done = le->done();
-	auto remaining = le->remaining();
-
-
-	lb->adjust_learning(effort, remaining);
+	ENDF(__func__);
 }
 
 OperatorID SearchCtrl::select_action()
@@ -120,7 +120,8 @@ void SearchCtrl::print_statistics() const
 	std::cout << "Average number of expansions: " << avg << "\n"
 		  << "Minimum number of expansions: " << min << "\n"
 		  << "Maximum number of expansions: " << max << "\n"
-		  << "Median expansions: " << med << "\n";
+		  << "Median expansions: " << med << "\n"
+		  << "Number of catchup learning phases: " << catchups << "\n";
 }
 
 }

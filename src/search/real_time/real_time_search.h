@@ -5,10 +5,7 @@
 #include "expansion_delay.h"
 #include "heuristic_error.h"
 #include "search_ctrl.h"
-#include "../open_list.h"
 #include "../search_engine.h"
-
-#include "util.h"
 
 #include <memory>
 
@@ -40,8 +37,8 @@ protected:
 
 public:
 	explicit RealTimeSearch(const options::Options &opts);
-	~RealTimeSearch() override {};
-	auto get_expanded_states() -> std::unique_ptr<std::unordered_set<StateID> > override { return std::move(sc.ls->get_expanded_states()); }
+	~RealTimeSearch() override;
+	auto get_expanded_states() -> std::unique_ptr<std::unordered_set<StateID> > override;
 
 	void print_statistics() const override;
 };

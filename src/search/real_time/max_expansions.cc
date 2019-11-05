@@ -19,7 +19,7 @@ MaxExpansions::MaxExpansions(int b): stats(nullptr), bound(b) {}
 bool MaxExpansions::lookahead_ok()
 {
 	assert(stats != nullptr);
-	return stats->get_expanded() <= bound;
+	return stats->get_expanded() < bound;
 }
 
 bool MaxExpansions::learning_ok() const
@@ -33,15 +33,6 @@ void MaxExpansions::initialize(LookaheadSearch const &ls)
 {
 	stats = &ls.get_statistics();
 	assert(stats->get_expanded() == 1);
-}
-
-void MaxExpansions::adjust_learning(size_t effort, size_t remaining)
-{
-	// The expansion bound approach can always takes as long as it
-	// needs to during learning.  Therefore there's nothing to
-	// adjust.
-	(void)&effort;
-	(void)&remaining;
 }
 
 void MaxExpansions::print_surplus() const

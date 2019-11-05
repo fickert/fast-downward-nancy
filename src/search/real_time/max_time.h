@@ -25,7 +25,6 @@ struct MaxTime : Bound
 	bool lookahead_ok() final;
 	bool learning_ok() const final;
 	void initialize(LookaheadSearch const &ls) final;
-	void adjust_learning(size_t effort, size_t remaining) final;
 	void print_surplus() const final;
 };
 

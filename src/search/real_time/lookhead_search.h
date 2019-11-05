@@ -83,6 +83,8 @@ public:
 	auto get_search_space() const -> SearchSpace & { return *search_space.get(); }
 	auto get_frontier() const -> const decltype(frontier) & { return frontier; }
 	auto get_predecessors() const -> const decltype(predecessors) & { return predecessors; }
+	auto next_lap() -> void { lt.reset(); }
+	auto stop_lap() -> std::chrono::milliseconds { lt.pause(); return get_duration(); }
 	auto get_duration() const -> std::chrono::milliseconds { return lt.get(); }
 	// this is consumed during learning.  that's fine, no one else
 	// needs this.

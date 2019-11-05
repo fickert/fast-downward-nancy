@@ -33,6 +33,8 @@ struct SearchCtrl
 	// expansions in each lookahead phase.  interesting to look at
 	// when a time bound is used.
 	std::vector<int> expansions;
+	// how often did we run out of time during learning
+	int catchups;
 
 	// we select an action first, then do the learning. if we
 	// couldn't finish it, we gotta do it next iteration before

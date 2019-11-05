@@ -767,30 +767,33 @@ fast_downward_plugin(
         real_time/kinds
         real_time/solve_all
         real_time/astar_solve_all
-	real_time/rt_solve_all
+        real_time/rt_solve_all
         real_time/debiased_heuristic
-	real_time/decision
-	real_time/scalar_decider
-	real_time/dist_decider
+        real_time/decision
+        real_time/scalar_decider
+        real_time/dist_decider
         real_time/learning
-	real_time/dijkstra_backup
-	real_time/nancy_backup
+        real_time/dijkstra_backup
+        real_time/nancy_backup
         real_time/expansion_delay
         real_time/heuristic_error
         real_time/learning_evaluator
         real_time/lookhead_search
-	real_time/bound
-	real_time/max_expansions
-	real_time/lap_timer
+        real_time/bound
+        real_time/max_expansions
+        real_time/lap_timer
         real_time/max_time
-	real_time/search_ctrl
+        real_time/search_ctrl
         real_time/state_collector
         real_time/real_time_search
+        real_time/rts_constructor
+        real_time/rts_initialize
+        real_time/rts_step
         real_time/util
         real_time/belief_data
         real_time/belief_store
         real_time/DiscreteDistribution
-	real_time/tlas
+        real_time/tlas
         real_time/risk_search
     DEPENDS SEARCH_COMMON
 )

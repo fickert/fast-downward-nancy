@@ -1,6 +1,19 @@
 #include "dijkstra_backup.h"
 #include "../evaluation_context.h"
 
+// #define TRACKDB
+
+#ifdef TRACKDB
+#define BEGINF(X) std::cout << "DB: ENTER: " << X << "\n";
+#define ENDF(X) std::cout << "DB: EXIT: " << X << "\n";
+#define TRACKP(X) std::cout << "DB: " << X << "\n";
+#else
+#define BEGINF(X)
+#define ENDF(X)
+#define TRACKP(X)
+#endif
+
+
 namespace real_time
 {
 
@@ -13,11 +26,14 @@ void DijkstraBackup::initialize(const std::unordered_map<StateID, std::vector<st
 	const std::vector<StateID> &frontier,
 	std::unordered_set<StateID> &closed_)
 {
+	TRACKP("setting predecessors and closed");
 	predecessors = &predecessors_;
 	closed = &closed_;
+	TRACKP("getting initial effort");
 	initial_effort = closed->size();
 
 	if (h_before) {
+		TRACKP("computing h before");
 		// ensure the heuristic values are cached for all states
 		const auto evaluate = [this](const auto &state_id) {
 			auto state = state_registry.lookup_state(state_id);
@@ -33,9 +49,11 @@ void DijkstraBackup::initialize(const std::unordered_map<StateID, std::vector<st
 	}
 
 
+	TRACKP("iterating over closed");
 	for (const auto &state_id : (*closed))
 		learning_evaluator->update_value(state_registry.lookup_state(state_id), EvaluationResult::INFTY);
 
+	TRACKP("iterating over frontier");
 	for (const auto &state_id : frontier) {
 		auto state = state_registry.lookup_state(state_id);
 		assert(learning_evaluator->is_estimate_cached(state));
@@ -111,3 +129,7 @@ size_t DijkstraBackup::remaining()
 
 
 }
+
+#undef BEGINF
+#undef ENDF
+#undef TRACKP

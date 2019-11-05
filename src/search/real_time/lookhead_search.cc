@@ -14,7 +14,8 @@
 
 namespace real_time {
 
-void LookaheadSearch::mark_expanded(SearchNode &node) {
+void LookaheadSearch::mark_expanded(SearchNode &node)
+{
 	statistics->inc_expanded();
 	node.close();
 	if (store_exploration_data)
@@ -23,7 +24,8 @@ void LookaheadSearch::mark_expanded(SearchNode &node) {
 		expansion_delay->update_expansion_delay(statistics->get_expanded() - open_list_insertion_time[node.get_state_id()]);
 }
 
-auto LookaheadSearch::check_goal_and_set_plan(const GlobalState &state) -> bool {
+auto LookaheadSearch::check_goal_and_set_plan(const GlobalState &state) -> bool
+{
 	if (task_properties::is_goal_state(task_proxy, state)) {
 		auto plan = Plan();
 		search_space->trace_path(state, plan);
@@ -33,19 +35,20 @@ auto LookaheadSearch::check_goal_and_set_plan(const GlobalState &state) -> bool 
 	return false;
 }
 
-LookaheadSearch::LookaheadSearch(StateRegistry &state_registry, int lookahead_bound, bool store_exploration_data, ExpansionDelay *expansion_delay, HeuristicError *heuristic_error, SearchEngine const *search_engine) :
-	solution_found(false),
-	task(tasks::g_root_task),
-	task_proxy(*task),
-	state_registry(state_registry),
-	successor_generator(successor_generator::g_successor_generators[task_proxy]),
-	search_engine(search_engine),
-	lookahead_bound(lookahead_bound),
-	store_exploration_data(store_exploration_data),
-	expansion_delay(expansion_delay),
-	heuristic_error(heuristic_error) {}
+LookaheadSearch::LookaheadSearch(StateRegistry &state_registry, int lookahead_bound, bool store_exploration_data, ExpansionDelay *expansion_delay, HeuristicError *heuristic_error, SearchEngine const *search_engine)
+	: solution_found(false),
+	  task(tasks::g_root_task),
+	  task_proxy(*task),
+	  state_registry(state_registry),
+	  successor_generator(successor_generator::g_successor_generators[task_proxy]),
+	  search_engine(search_engine),
+	  lookahead_bound(lookahead_bound),
+	  store_exploration_data(store_exploration_data),
+	  expansion_delay(expansion_delay),
+	  heuristic_error(heuristic_error) {}
 
-void LookaheadSearch::initialize(const GlobalState &initial_state) {
+void LookaheadSearch::initialize(const GlobalState &initial_state)
+{
 	solution_found = false;
 	plan.clear();
 	search_space = std::make_unique<SearchSpace>(state_registry);
@@ -62,10 +65,11 @@ void LookaheadSearch::initialize(const GlobalState &initial_state) {
 		open_list_insertion_time.clear();
 }
 
-EagerLookaheadSearch::EagerLookaheadSearch(StateRegistry &state_registry, int lookahead_bound, bool store_exploration_data, ExpansionDelay *expansion_delay, HeuristicError *heuristic_error, SearchEngine const *search_engine) :
-	LookaheadSearch(state_registry, lookahead_bound, store_exploration_data, expansion_delay, heuristic_error, search_engine) {}
+EagerLookaheadSearch::EagerLookaheadSearch(StateRegistry &state_registry, int lookahead_bound, bool store_exploration_data, ExpansionDelay *expansion_delay, HeuristicError *heuristic_error, SearchEngine const *search_engine)
+	: LookaheadSearch(state_registry, lookahead_bound, store_exploration_data, expansion_delay, heuristic_error, search_engine) {}
 
-void EagerLookaheadSearch::initialize(const GlobalState &initial_state) {
+void EagerLookaheadSearch::initialize(const GlobalState &initial_state)
+{
 	LookaheadSearch::initialize(initial_state);
 	open_list = create_open_list();
 	auto eval_context = EvaluationContext(initial_state, 0, false, statistics.get());
