@@ -4,8 +4,7 @@
 #include "../utils/system.h"
 #include "util.h"
 #include <algorithm>
-#include <execution> // for execution::seq
-#include <numeric> // for reduce
+#include <numeric> // for accumulate
 
 #include <iostream>
 
@@ -52,7 +51,7 @@ void RealTimeSearch::print_statistics() const {
 		// 	std::cout << tmp << '\n';
 		// }
 		std::sort(v.begin(), v.end());
-		auto avg = std::reduce(std::execution::seq, v.begin(), v.end(), 0, [](auto a, auto b) {return a + b;}) / num_entries;
+		auto avg = std::accumulate(v.begin(), v.end(), 0, [](auto a, auto b) {return a + b;}) / num_entries;
 		auto min = v[0];
 		auto max = v[v.size()-1];
 		auto med = ((v.size() & 1) == 0) ? (v[v.size()/2-1]+v[v.size()/2])/2:v[v.size()/2];
