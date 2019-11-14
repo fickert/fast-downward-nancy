@@ -790,6 +790,7 @@ fast_downward_plugin(
         real_time/rts_initialize
         real_time/rts_step
         real_time/util
+	real_time/vec_stats
         real_time/belief_data
         real_time/belief_store
         real_time/DiscreteDistribution

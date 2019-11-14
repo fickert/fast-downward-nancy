@@ -3,7 +3,9 @@
 #include <numeric>   // accumulate
 #include <algorithm> // sort
 #include <chrono>    // the search control itself also measures time
+#include <tuple>
 
+#include "vec_stats.h"
 #include "lap_timer.h"
 
 // #define TRACKSC
@@ -31,7 +33,9 @@ SearchCtrl::SearchCtrl(GlobalState const &s, LookaheadSearchMethod lsm, BackupMe
 	  ds(ds),
 	  dec(nullptr),
 	  learning_done(true)
-{}
+{
+	durations.reserve(1 << 18); // 262144, should be plenty for most instances
+}
 SearchCtrl::~SearchCtrl() {}
 
 void SearchCtrl::initialize_lookahead(GlobalState const &s)
@@ -57,9 +61,11 @@ SearchStatus SearchCtrl::search()
 	while (lb->lookahead_ok() && res == IN_PROGRESS) {
 		ls->next_lap();
 		res = ls->step();
-		ls->stop_lap();
+		auto dur = ls->stop_lap();
+		durations.push_back((std::chrono::duration_cast<std::chrono::nanoseconds>(dur)).count());
 	}
 	expansions.push_back(ls->get_statistics().get_expanded());
+	TRACKP("expanded " << ls->get_statistics().get_expanded());
 	switch (res) {
 	case FAILED:        return FAILED;
 	case SOLVED:        return SOLVED;
@@ -102,26 +108,33 @@ OperatorID SearchCtrl::select_action()
 void SearchCtrl::prepare_statistics()
 {
 	std::sort(expansions.begin(), expansions.end());
+	std::sort(durations.begin(), durations.end());
 }
+
+// template<typename T>
+// std::tuple<T,T,T,T> vec_stats(std::vector<T> const &v)
+// {
+// }
 
 void SearchCtrl::print_statistics() const
 {
 	ls->print_statistics();
 
-	assert(std::is_sorted(expansions.begin(), expansions.end()));
-	auto const &v = expansions;
-	size_t s = v.size();
-	assert(s > 0);
-	int avg = std::accumulate(v.begin(), v.end(), 0) / s;
-	int min = v[0];
-	int max = v[s-1];
-	int med = ((s & 1) == 0) ? (v[(s/2)-1] + v[s/2]) / 2 : v[s/2];
+	auto estats = vec_stats(expansions);
+	auto dstats = vec_stats(durations);
 
-	std::cout << "Average number of expansions: " << avg << "\n"
-		  << "Minimum number of expansions: " << min << "\n"
-		  << "Maximum number of expansions: " << max << "\n"
-		  << "Median expansions: " << med << "\n"
+	std::cout << "Average number of expansions: " << estats.avg << "\n"
+		  << "Minimum number of expansions: " << estats.min << "\n"
+		  << "Maximum number of expansions: " << estats.max << "\n"
+		  << "Median expansions: " << estats.med << "\n"
+		  << "Average lookahead iteration duration: " << dstats.avg << "ns\n"
+		  << "Minimum lookahead iteration duration: " << dstats.min << "ns\n"
+		  << "Maximum lookahead iteration duration: " << dstats.max << "ns\n"
+		  << "Median lookahead iteration duration: " << dstats.med << "ns\n"
 		  << "Number of catchup learning phases: " << catchups << "\n";
+
+
+
 }
 
 }

@@ -3,6 +3,8 @@
 
 #include <memory>
 
+#include <vector>
+
 #include "../search_engine.h" // for SearchStatus
 
 #include "kinds.h"
@@ -33,7 +35,13 @@ struct SearchCtrl
 	// expansions in each lookahead phase.  interesting to look at
 	// when a time bound is used.
 	std::vector<int> expansions;
-	// how often did we run out of time during learning
+	// debug statistics.  this vector collects the times of each
+	// expansion iteration in the lookahead phase.  how often did
+	// we run out of time during learning
+	std::vector<std::chrono::milliseconds::rep> durations;
+	// debug statistics.  this counts how often the algorithm ran
+	// out of time during the learning phase.  With the current
+	// default settings, this is pretty much always zero.
 	int catchups;
 
 	// we select an action first, then do the learning. if we
