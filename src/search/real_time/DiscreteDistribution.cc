@@ -420,57 +420,17 @@ void DiscreteDistribution::createFromGaussian(double f, double mean, double d, d
   }
 }
 
-// TODO: doesn't matter if we're using data anyway, but this is a little inefficient
-DiscreteDistribution& DiscreteDistribution::squish(double factor)
+DiscreteDistribution& DiscreteDistribution::squish(double f)
 {
-  std::vector<ProbabilityNode> newDistribution;
-  double mean = expectedCost();
+	const double mean = expectedCost();
 
-  // If the squish factor is 1, all values in distribution will be moved to the mean.
-  if (factor == 1) {
-    newDistribution.push_back(ProbabilityNode(mean, 1.0));
-    distribution.clear();
-    distribution = newDistribution;
+	if (f == 1.0)
+		distribution = std::vector<ProbabilityNode>{ProbabilityNode(mean, 1.0)};
+	else
+		std::for_each(distribution.begin(), distribution.end(),
+			      [mean,f](auto &n) { n.cost += f * (mean - n.cost); });
 
-    return *this;
-  }
-
-  /*
-    cout << "Before Squish Cost,Before Squish Probability" << endl;
-    for (ProbabilityNode n : distribution)
-    {
-    cout << n.cost << "," << n.probability << endl;
-    }
-    cout << endl;
-  */
-
-  for (ProbabilityNode n : distribution) {
-    double distanceToMean = abs(n.cost - mean);
-    double distanceToShift = distanceToMean * factor;
-
-    double shiftedCost = n.cost;
-
-    if (shiftedCost > mean)
-      shiftedCost -= distanceToShift;
-    else if (shiftedCost < mean)
-      shiftedCost += distanceToShift;
-
-    newDistribution.push_back(ProbabilityNode(shiftedCost, n.probability));
-  }
-
-  distribution.clear();
-  distribution = newDistribution;
-
-  /*
-    cout << "Squish Cost,Squish Probability" << endl;
-    for (ProbabilityNode n : distribution)
-    {
-    cout << n.cost << "," << n.probability << endl;
-    }
-    cout << endl;
-  */
-
-  return *this;
+	return *this;
 }
 
 double DiscreteDistribution::expectedCost() const
