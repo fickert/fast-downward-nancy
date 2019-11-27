@@ -19,7 +19,7 @@ namespace real_time
 SearchStatus RealTimeSearch::step() {
 	++num_rts_phases;
 	sc.initialize_lookahead(current_state);
-	TRACKP("doing lookahead");
+	TRACKP("doing lookahead from " << current_state.get_id());
 	const auto status = sc.search();
 	TRACKP("finished lookahead");
 

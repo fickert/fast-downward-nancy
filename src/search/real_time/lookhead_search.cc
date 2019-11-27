@@ -12,6 +12,19 @@
 #include "../task_utils/task_properties.h"
 #include "../open_lists/best_first_open_list.h"
 
+// #define TRACKLS
+
+#ifdef TRACKLS
+#define BEGINF(X) std::cout << "LS: ENTER: " << X << "\n";
+#define ENDF(X) std::cout << "LS: EXIT: " << X << "\n";
+#define TRACKP(X) std::cout << "LS: " << X << "\n";
+#else
+#define BEGINF(X)
+#define ENDF(X)
+#define TRACKP(X)
+#endif
+
+
 namespace real_time {
 
 void LookaheadSearch::mark_expanded(SearchNode &node)
@@ -68,15 +81,61 @@ void LookaheadSearch::initialize(const GlobalState &initial_state)
 EagerLookaheadSearch::EagerLookaheadSearch(StateRegistry &state_registry, int lookahead_bound, bool store_exploration_data, ExpansionDelay *expansion_delay, HeuristicError *heuristic_error, SearchEngine const *search_engine)
 	: LookaheadSearch(state_registry, lookahead_bound, store_exploration_data, expansion_delay, heuristic_error, search_engine) {}
 
+// We do the first expansion manually.  This way we guarantee that at
+// least one node is always expanded.  Otherwise the algorithm might
+// crash very ungracefully when low time limits are used.
 void EagerLookaheadSearch::initialize(const GlobalState &initial_state)
 {
 	LookaheadSearch::initialize(initial_state);
 	open_list = create_open_list();
-	auto eval_context = EvaluationContext(initial_state, 0, false, statistics.get());
+	auto root_node = search_space->get_node(initial_state);
+	auto const cur_state_id = initial_state.get_id();
+	auto root_eval_context = EvaluationContext(initial_state, 0, false, statistics.get());
 	statistics->inc_evaluated_states();
-	open_list->insert(eval_context, initial_state.get_id());
 	if (expansion_delay)
-		open_list_insertion_time[initial_state.get_id()] = 0;
+		open_list_insertion_time[cur_state_id] = 0;
+
+	auto applicables = std::vector<OperatorID>();
+	successor_generator.generate_applicable_ops(initial_state, applicables);
+
+	for (auto op_id : applicables) {
+		auto const op = task_proxy.get_operators()[op_id];
+		auto const succ_state = state_registry.get_successor_state(initial_state, op);
+		auto const succ_state_id = succ_state.get_id();
+		auto succ_node = search_space->get_node(succ_state);
+		auto const adj_cost = search_engine->get_adjusted_cost(op);
+		auto const succ_g = adj_cost;
+		if (succ_node.is_new()) {
+			succ_node.open(root_node, op, succ_g);
+		} else if (!succ_node.is_dead_end() && succ_g < succ_node.get_g()) {
+			succ_node.reopen(root_node, op, succ_g);
+		} else {
+			continue;
+		}
+
+		if (store_exploration_data)
+			predecessors[succ_state_id].emplace_back(cur_state_id, op);
+
+		auto succ_eval_context = EvaluationContext(succ_state, succ_g, false, statistics.get());
+		if (succ_node.is_dead_end()) {
+			succ_node.mark_as_dead_end();
+			statistics->inc_dead_ends();
+			continue;
+		}
+
+		open_list->insert(succ_eval_context, succ_state_id);
+
+		if (heuristic_error)
+			heuristic_error->add_successor(succ_node, adj_cost);
+	}
+
+	TRACKP("expanded initial state");
+
+	mark_expanded(root_node);
+	statistics->inc_generated();
+	if (heuristic_error)
+		heuristic_error->update_error();
+
 }
 
 auto EagerLookaheadSearch::step() -> SearchStatus
@@ -192,3 +251,8 @@ FHatLookaheadSearch::FHatLookaheadSearch(StateRegistry &state_registry, int look
 static options::PluginTypePlugin<LookaheadSearch> _type_plugin("LookaheadSearch", "Lookahead search engine for real-time search");
 
 }
+
+#undef TRACKLS
+#undef BEGINF
+#undef ENDF
+#undef TRACKP

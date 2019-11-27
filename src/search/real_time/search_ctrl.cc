@@ -62,7 +62,7 @@ SearchStatus SearchCtrl::search()
 		ls->next_lap();
 		res = ls->step();
 		auto dur = ls->stop_lap();
-		durations.push_back((std::chrono::duration_cast<std::chrono::nanoseconds>(dur)).count());
+		//durations.push_back((std::chrono::duration_cast<std::chrono::nanoseconds>(dur)).count());
 	}
 	expansions.push_back(ls->get_statistics().get_expanded());
 	TRACKP("expanded " << ls->get_statistics().get_expanded());
@@ -108,7 +108,7 @@ OperatorID SearchCtrl::select_action()
 void SearchCtrl::prepare_statistics()
 {
 	std::sort(expansions.begin(), expansions.end());
-	std::sort(durations.begin(), durations.end());
+	// std::sort(durations.begin(), durations.end());
 }
 
 // template<typename T>
@@ -121,17 +121,18 @@ void SearchCtrl::print_statistics() const
 	ls->print_statistics();
 
 	auto estats = vec_stats(expansions);
-	auto dstats = vec_stats(durations);
 
 	std::cout << "Average number of expansions: " << estats.avg << "\n"
 		  << "Minimum number of expansions: " << estats.min << "\n"
 		  << "Maximum number of expansions: " << estats.max << "\n"
 		  << "Median expansions: " << estats.med << "\n"
-		  << "Average lookahead iteration duration: " << dstats.avg << "ns\n"
-		  << "Minimum lookahead iteration duration: " << dstats.min << "ns\n"
-		  << "Maximum lookahead iteration duration: " << dstats.max << "ns\n"
-		  << "Median lookahead iteration duration: " << dstats.med << "ns\n"
 		  << "Number of catchup learning phases: " << catchups << "\n";
+	//auto dstats = vec_stats(durations);
+	// std::cout << "Average lookahead iteration duration: " << dstats.avg << "ns\n"
+	// 	  << "Minimum lookahead iteration duration: " << dstats.min << "ns\n"
+	// 	  << "Maximum lookahead iteration duration: " << dstats.max << "ns\n"
+	// 	  << "Median lookahead iteration duration: " << dstats.med << "ns\n";
+
 
 
 
