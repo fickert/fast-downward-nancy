@@ -796,6 +796,8 @@ fast_downward_plugin(
         real_time/DiscreteDistribution
         real_time/tlas
         real_time/risk_search
+	real_time/online_risk_search
+	real_time/online_nancy_decider
     DEPENDS SEARCH_COMMON
 )
 

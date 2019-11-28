@@ -16,6 +16,7 @@ enum class DecisionStrategy
  MINIMIN,
  BELLMAN,
  NANCY,
+ ONLINE_NANCY,
  CSERNA,
  K_BEST
 };
@@ -26,7 +27,8 @@ enum class LookaheadSearchMethod
  A_STAR_COLLECT,
  F_HAT,
  BREADTH_FIRST,
- RISK
+ RISK,
+ ONLINE_RISK
 };
 
 enum class BoundKind

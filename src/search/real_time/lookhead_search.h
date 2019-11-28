@@ -36,7 +36,6 @@ protected:
 
 	SearchEngine const *search_engine; // to call get_adjusted_cost
 	std::unique_ptr<SearchSpace> search_space;
-	const int lookahead_bound;
 	std::vector<StateID> frontier;
 
 	const bool store_exploration_data;
@@ -53,7 +52,6 @@ protected:
 	bool check_goal_and_set_plan(const GlobalState &state);
 public:
 	LookaheadSearch(StateRegistry &state_registry,
-	                int lookahead_bound,
 	                bool store_exploration_data,
 	                ExpansionDelay *expansion_delay,
 	                HeuristicError *heuristic_error,
@@ -102,7 +100,6 @@ protected:
 	virtual auto create_open_list() const -> std::unique_ptr<StateOpenList> = 0;
 public:
 	EagerLookaheadSearch(StateRegistry &state_registry,
-	                     int lookahead_bound,
 	                     bool store_exploration_data,
 	                     ExpansionDelay *expansion_delay,
 	                     HeuristicError *heuristic_error,
@@ -127,7 +124,6 @@ protected:
 	auto create_open_list() const -> std::unique_ptr<StateOpenList> override;
 public:
 	AStarLookaheadSearch(StateRegistry &state_registry,
-	                     int lookahead_bound,
 	                     std::shared_ptr<Evaluator> heuristic,
 	                     bool store_exploration_data,
 	                     ExpansionDelay *expansion_delay,
@@ -147,7 +143,6 @@ protected:
 	auto create_open_list() const->std::unique_ptr<StateOpenList> override;
 public:
 	BreadthFirstLookaheadSearch(StateRegistry &state_registry,
-	                            int lookahead_bound,
 	                            bool store_exploration_data,
 	                            ExpansionDelay *expansion_delay,
 	                            HeuristicError *heuristic_error,
@@ -168,13 +163,12 @@ protected:
 	auto create_open_list() const -> std::unique_ptr<StateOpenList> override;
 public:
 	FHatLookaheadSearch(StateRegistry &state_registry,
-	                    int lookahead_bound,
 	                    std::shared_ptr<Evaluator> heuristic,
 	                    std::shared_ptr<Evaluator> distance,
 	                    bool store_exploration_data,
 	                    ExpansionDelay *expansion_delay,
 	                    HeuristicError &heuristic_error,
-                      SearchEngine const *search_engine);
+			    SearchEngine const *search_engine);
 	~FHatLookaheadSearch() override = default;
 
 	FHatLookaheadSearch(const FHatLookaheadSearch &) = delete;

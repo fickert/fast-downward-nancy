@@ -63,6 +63,9 @@ class RiskLookaheadSearch : public LookaheadSearch
 	std::vector<OperatorID> applicables;
 protected:
 	//std::unique_ptr<StateOpenList> create_open_list() const;
+	bool add_state_owner(StateID state_id, int tla_id);
+	void make_state_owner(StateID state_id, int tla_id);
+	bool state_owned_by_tla(StateID state_id, int tla_id) const;
 	double risk_analysis(std::size_t const alpha, const vector<ShiftedDistribution> &beliefs) const;
 	std::size_t select_tla();
 	void backup_beliefs();
@@ -71,7 +74,6 @@ protected:
 public:
 
 	RiskLookaheadSearch(StateRegistry &state_registry,
-		int lookahead_bound,
 		std::shared_ptr<Evaluator> heuristic,
 		std::shared_ptr<Evaluator> base_heuristic,
 		std::shared_ptr<Evaluator> distance,

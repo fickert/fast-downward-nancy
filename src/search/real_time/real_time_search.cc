@@ -75,9 +75,9 @@ static auto _parse(options::OptionParser &parser) -> std::shared_ptr<SearchEngin
 	// TODO: check if the default value here makes any sense.
 	parser.add_option<int>("time_bound","Lookahead bound in milli seconds.", "200");
 	parser.add_enum_option("rtbound_type", {"EXPANSIONS", "TIME"}, "Type of bound the algorithm is running under", "EXPANSIONS");
-	parser.add_enum_option("lookahead_search", {"A_STAR", "A_STAR_COLLECT", "F_HAT", "BREADTH_FIRST", "RISK"}, "Lookahead search algorithm", "A_STAR");
+	parser.add_enum_option("lookahead_search", {"A_STAR", "A_STAR_COLLECT", "F_HAT", "BREADTH_FIRST", "RISK", "ONLINE_RISK"}, "Lookahead search algorithm", "A_STAR");
 	parser.add_enum_option("learning", {"NONE","DIJKSTRA","NANCY"}, "What kind of learning update to perform (DIJKSTRA for heuristic values, NANCY for beliefs)", "NONE");
-	parser.add_enum_option("decision_strategy", {"MINIMIN", "BELLMAN", "NANCY", "CSERNA", "K_BEST"}, "Top-level action selection strategy", "MINIMIN");
+	parser.add_enum_option("decision_strategy", {"MINIMIN", "BELLMAN", "NANCY", "ONLINE_NANCY", "CSERNA", "K_BEST"}, "Top-level action selection strategy", "MINIMIN");
 	parser.add_enum_option("feature_kind", {"JUST_H", "WITH_PARENT_H"}, "Kind of features to look up the beliefs in the data (the data format has to match)", "JUST_H");
 	parser.add_enum_option("post_feature_kind", {"JUST_H", "WITH_PARENT_H"}, "Kind of features to look up the post beliefs in the data (the data format has to match)", "JUST_H");
 	// parser.add_option<int>("k", "Value for k-best decision strategy", "3");

@@ -19,7 +19,6 @@ protected:
 public:
 	std::unique_ptr<std::unordered_set<StateID> > get_expanded_states() final;
 	EagerCollector(StateRegistry &state_registry,
-		       int lookahead_bound,
 		       bool store_exploration_data,
 		       ExpansionDelay *expansion_delay,
 		       HeuristicError *heuristic_error,
@@ -34,7 +33,6 @@ protected:
 	auto create_open_list() const -> std::unique_ptr<StateOpenList> override;
 public:
 	AStarCollect(StateRegistry &state_registry,
-		     int lookahead_bound,
 		     std::shared_ptr<Evaluator> heuristic,
 		     bool store_exploration_data,
 		     ExpansionDelay *expansion_delay,

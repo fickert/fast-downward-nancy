@@ -23,7 +23,7 @@
 namespace real_time
 {
 
-bool state_owned_by_tla(std::unordered_map<StateID, std::vector<int> > const &state_owners, StateID state_id, int tla_id)
+bool RiskLookaheadSearch::state_owned_by_tla(StateID state_id, int tla_id) const
 {
   const auto &owners = state_owners.find(state_id);
   if (owners == state_owners.end()) {
@@ -39,7 +39,7 @@ bool state_owned_by_tla(std::unordered_map<StateID, std::vector<int> > const &st
   return true;
 }
 
-void make_state_owner(std::unordered_map<StateID, std::vector<int> > &state_owners, StateID state_id, int tla_id)
+void RiskLookaheadSearch::make_state_owner(StateID state_id, int tla_id)
 {
   auto &owners = state_owners[state_id];
   owners.clear();
@@ -47,7 +47,7 @@ void make_state_owner(std::unordered_map<StateID, std::vector<int> > &state_owne
   assert(state_owners[state_id].size() == 1);
 }
 
-bool add_state_owner(std::unordered_map<StateID, std::vector<int> > &state_owners, StateID state_id, int tla_id)
+bool RiskLookaheadSearch::add_state_owner(StateID state_id, int tla_id)
 {
   auto owners = state_owners[state_id];
   auto found = std::find(std::begin(owners), std::end(owners), tla_id);
@@ -198,7 +198,7 @@ void RiskLookaheadSearch::initialize(const GlobalState &initial_state)
 		// make the tla own the state of the top level node (I assume
 		// here, that the state of all top level nodes are distinct)
 		assert(state_owners[succ_state_id].empty());
-		make_state_owner(state_owners, succ_state_id, static_cast<int>(tlas.ops.size()) - 1);
+		make_state_owner(succ_state_id, static_cast<int>(tlas.ops.size()) - 1);
 
 		if (heuristic_error)
 			heuristic_error->add_successor(succ_node, adj_cost);
@@ -367,7 +367,7 @@ void RiskLookaheadSearch::backup_beliefs()
       // we want the g from best_state to top level node, not to root
       auto const g = best_state.first.g - tlas.op_costs[tla_id];
       // only consider this state if we own it
-      if (state_owned_by_tla(state_owners, state_id, tla_id)) {
+      if (state_owned_by_tla(state_id, tla_id)) {
         // only do backup if it's a different state from last time
         if (state_id != tlas.states[tla_id].first) {
           auto best_state = state_registry.lookup_state(state_id);
@@ -418,7 +418,7 @@ SearchStatus RiskLookaheadSearch::step()
 	StateID state_id = top.second;
 	int this_h = top.first.h;
 	while (1) {
-		if (state_owned_by_tla(state_owners, state_id, tla_id))
+		if (state_owned_by_tla(state_id, tla_id))
 			break;
 		if (tlas.open_lists[tla_id].empty()) {
 			return FAILED;
@@ -433,7 +433,7 @@ SearchStatus RiskLookaheadSearch::step()
 		goto get_node;
 
 	mark_expanded(node);
-	assert(state_owned_by_tla(state_owners, state_id, tla_id));
+	assert(state_owned_by_tla(state_id, tla_id));
 
 	if (check_goal_and_set_plan(state)) {
 		return SOLVED;
@@ -478,7 +478,7 @@ SearchStatus RiskLookaheadSearch::step()
 								       succ_g,
 								       succ_eval_context.get_result(heuristic.get()).get_evaluator_value()),
 							succ_state_id);
-			make_state_owner(state_owners, succ_state_id, tla_id);
+			make_state_owner(succ_state_id, tla_id);
 		} else {
 			auto const old_g = succ_node.get_g();
 			auto const new_g = node.get_g() + adj_cost;
@@ -492,13 +492,13 @@ SearchStatus RiskLookaheadSearch::step()
 									       new_g,
 									       succ_eval_context.get_result(heuristic.get()).get_evaluator_value()),
 								succ_state_id);
-				make_state_owner(state_owners, succ_state_id, tla_id);
+				make_state_owner(succ_state_id, tla_id);
 			}
 			// TODO: not sure if this part is really necessary or even desriable.
 			// It definitely breaks with 0 cost actions.
 			// else if (old_g == new_g) {
 			//   // optimal alternative to get to this state
-			//   bool new_owner = add_state_owner(state_owners, succ_state_id, tla_id);
+			//   bool new_owner = add_state_owner(succ_state_id, tla_id);
 			//   if (new_owner) {
 			//     if (succ_node.is_closed())
 			//       statistics->inc_reopened();
@@ -528,7 +528,7 @@ void RiskLookaheadSearch::post()
 	for (size_t i = 0; i < tlas.open_lists.size(); ++i) {
 		while (!tlas.open_lists[i].empty()) {
 			StateID state_id = tlas.remove_min(i).second;
-			if (state_owned_by_tla(state_owners, state_id, i))
+			if (state_owned_by_tla(state_id, i))
 				frontier.push_back(state_id);
 		}
 	}
@@ -541,7 +541,7 @@ void RiskLookaheadSearch::print_statistics() const {
             << "Number of expansions under beta: " << beta_expansion_count << "\n";
 }
 
-RiskLookaheadSearch::RiskLookaheadSearch(StateRegistry &state_registry, int lookahead_bound,
+RiskLookaheadSearch::RiskLookaheadSearch(StateRegistry &state_registry,
                                          std::shared_ptr<Evaluator> heuristic, std::shared_ptr<Evaluator> base_heuristic, std::shared_ptr<Evaluator> distance,
                                          bool store_exploration_data, ExpansionDelay *expansion_delay, HeuristicError *heuristic_error,
                                          HStarData<int> *hstar_data,
@@ -549,7 +549,7 @@ RiskLookaheadSearch::RiskLookaheadSearch(StateRegistry &state_registry, int look
                                          SearchEngine const *search_engine,
                                          DataFeatureKind f_kind,
                                          DataFeatureKind pf_kind)
-  : LookaheadSearch(state_registry, lookahead_bound, store_exploration_data,
+  : LookaheadSearch(state_registry, store_exploration_data,
                     expansion_delay, heuristic_error, search_engine),
     f_evaluator(std::make_shared<sum_evaluator::SumEvaluator>(std::vector<std::shared_ptr<Evaluator>>{heuristic, std::make_shared<g_evaluator::GEvaluator>()})),
     f_hat_evaluator(create_f_hat_evaluator(heuristic, distance, *heuristic_error)),
@@ -571,7 +571,7 @@ RiskLookaheadSearch::RiskLookaheadSearch(StateRegistry &state_registry, int look
 {
   tlas.reserve(32);
   applicables.reserve(32);
-  state_owners.reserve(lookahead_bound);
+  state_owners.reserve(256);
   assert(raw_beliefs.size() > 0 && raw_post_beliefs.size() > 0);
 
   auto *dead_distribution = new DiscreteDistribution(1);
@@ -594,5 +594,7 @@ RiskLookaheadSearch::~RiskLookaheadSearch()
 
 }
 
+#undef TRACKRISK
+#undef TRACKP
 #undef BEGINF
 #undef ENDF

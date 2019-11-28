@@ -21,12 +21,11 @@ void EagerCollector::collect(StateID id)
 }
 
 EagerCollector::EagerCollector(StateRegistry &state_registry,
-			       int lookahead_bound,
 			       bool store_exploration_data,
 			       ExpansionDelay *expansion_delay,
 			       HeuristicError *heuristic_error,
 			       SearchEngine const *search_engine)
-	: EagerLookaheadSearch(state_registry, lookahead_bound, store_exploration_data, expansion_delay, heuristic_error, search_engine)
+	: EagerLookaheadSearch(state_registry, store_exploration_data, expansion_delay, heuristic_error, search_engine)
 {
 	expanded_states = std::make_unique<std::unordered_set<StateID> >();
 }
@@ -48,8 +47,8 @@ void EagerCollector::mark_expanded(SearchNode &node)
 		expansion_delay->update_expansion_delay(statistics->get_expanded() - open_list_insertion_time[node.get_state_id()]);
 }
 
-AStarCollect::AStarCollect(StateRegistry &state_registry, int lookahead_bound, std::shared_ptr<Evaluator> heuristic, bool store_exploration_data, ExpansionDelay *expansion_delay, HeuristicError *heuristic_error, SearchEngine const *search_engine) :
-	EagerCollector(state_registry, lookahead_bound, store_exploration_data, expansion_delay, heuristic_error, search_engine),
+AStarCollect::AStarCollect(StateRegistry &state_registry, std::shared_ptr<Evaluator> heuristic, bool store_exploration_data, ExpansionDelay *expansion_delay, HeuristicError *heuristic_error, SearchEngine const *search_engine) :
+	EagerCollector(state_registry, store_exploration_data, expansion_delay, heuristic_error, search_engine),
 	f_evaluator(std::make_shared<sum_evaluator::SumEvaluator>(std::vector<std::shared_ptr<Evaluator>>{heuristic, std::make_shared<g_evaluator::GEvaluator>()})),
 	heuristic(heuristic) {}
 

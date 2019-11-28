@@ -68,6 +68,7 @@ SearchStatus RealTimeSearch::step() {
 }
 }
 
+#undef TRACKRT
 #undef BEGINF
 #undef ENDF
 #undef TRACKP

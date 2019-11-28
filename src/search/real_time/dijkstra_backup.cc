@@ -58,13 +58,14 @@ void DijkstraBackup::initialize(const std::unordered_map<StateID, std::vector<st
 		auto state = state_registry.lookup_state(state_id);
 		assert(learning_evaluator->is_estimate_cached(state));
 		learning_queue.emplace(learning_evaluator->get_cached_estimate(state), state_id);
-		closed->erase(state_id);
+		//closed->erase(state_id);
 	}
 }
 
 
 void DijkstraBackup::step()
 {
+	BEGINF(__func__);
 	assert(!done());
 
  get_entry:
@@ -79,37 +80,42 @@ void DijkstraBackup::step()
 	if (h == EvaluationResult::INFTY)
 		goto get_entry;
 
+	auto cls = closed->find(state_id);
+	if (cls != std::end(*closed))
+		closed->erase(cls);
+
 	assert(closed->find(state_id) == std::end(*closed));
+
 	auto predecessors_pos = predecessors->find(state_id);
 	if (predecessors_pos == std::end(*predecessors))
 		return; // state is the root state of the current lookahead search
 
 	for (const auto &[predecessor_id, op] : predecessors_pos->second) {
+		cls = closed->find(predecessor_id);
+		if (cls == std::end(*closed))
+			continue;
 		auto predecessor = state_registry.lookup_state(predecessor_id);
-		auto closed_it = closed->find(predecessor_id);
-		if (closed_it != std::end(*closed)) {
-			assert(learning_evaluator->is_estimate_cached(predecessor));
-			const auto predecessor_h = learning_evaluator->get_cached_estimate(predecessor);
-			const auto new_h = h + search_engine->get_adjusted_cost(op);
-			if (predecessor_h > new_h) {
-				closed->erase(closed_it);
-				// NOTE: the base evaluator should not need to be checked for consistent heuristics
-				learning_evaluator->update_value(predecessor, new_h, true);
-				learning_queue.emplace(new_h, predecessor_id);
-			}
-			if (distance_learning_evaluator) {
-				auto eval_context_predecessor = EvaluationContext(predecessor, 0, true, nullptr);
-				auto eval_context = EvaluationContext(state, 0, true, nullptr);
-				assert(!eval_context_predecessor.is_evaluator_value_infinite(distance_learning_evaluator.get()));
-				assert(!eval_context.is_evaluator_value_infinite(distance_learning_evaluator.get()));
-				const auto predecessor_d = eval_context_predecessor.get_evaluator_value(distance_learning_evaluator.get());
-				const auto new_d = eval_context.get_evaluator_value(distance_learning_evaluator.get()) + 1;
-				if (new_d > predecessor_d)
-					// NOTE: no need to check base evaluator, as values are only increased
-					distance_learning_evaluator->update_value(predecessor, new_d, false);
-			}
+		assert(learning_evaluator->is_estimate_cached(predecessor));
+		const auto predecessor_h = learning_evaluator->get_cached_estimate(predecessor);
+		const auto new_h = h + search_engine->get_adjusted_cost(op);
+		if (predecessor_h > new_h) {
+			// NOTE: the base evaluator should not need to be checked for consistent heuristics
+			learning_evaluator->update_value(predecessor, new_h, true);
+			learning_queue.emplace(new_h, predecessor_id);
+		}
+		if (distance_learning_evaluator) {
+			auto eval_context_predecessor = EvaluationContext(predecessor, 0, true, nullptr);
+			auto eval_context = EvaluationContext(state, 0, true, nullptr);
+			assert(!eval_context_predecessor.is_evaluator_value_infinite(distance_learning_evaluator.get()));
+			assert(!eval_context.is_evaluator_value_infinite(distance_learning_evaluator.get()));
+			const auto predecessor_d = eval_context_predecessor.get_evaluator_value(distance_learning_evaluator.get());
+			const auto new_d = eval_context.get_evaluator_value(distance_learning_evaluator.get()) + 1;
+			if (new_d > predecessor_d)
+				// NOTE: no need to check base evaluator, as values are only increased
+				distance_learning_evaluator->update_value(predecessor, new_d, false);
 		}
 	}
+	ENDF(__func__);
 }
 
 bool DijkstraBackup::done()
