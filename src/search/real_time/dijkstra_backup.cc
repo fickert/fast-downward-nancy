@@ -103,17 +103,17 @@ void DijkstraBackup::step()
 			learning_evaluator->update_value(predecessor, new_h, true);
 			learning_queue.emplace(new_h, predecessor_id);
 		}
-		if (distance_learning_evaluator) {
-			auto eval_context_predecessor = EvaluationContext(predecessor, 0, true, nullptr);
-			auto eval_context = EvaluationContext(state, 0, true, nullptr);
-			assert(!eval_context_predecessor.is_evaluator_value_infinite(distance_learning_evaluator.get()));
-			assert(!eval_context.is_evaluator_value_infinite(distance_learning_evaluator.get()));
-			const auto predecessor_d = eval_context_predecessor.get_evaluator_value(distance_learning_evaluator.get());
-			const auto new_d = eval_context.get_evaluator_value(distance_learning_evaluator.get()) + 1;
-			if (new_d > predecessor_d)
-				// NOTE: no need to check base evaluator, as values are only increased
-				distance_learning_evaluator->update_value(predecessor, new_d, false);
-		}
+		// if (distance_learning_evaluator) {
+		// 	auto eval_context_predecessor = EvaluationContext(predecessor, 0, true, nullptr);
+		// 	auto eval_context = EvaluationContext(state, 0, true, nullptr);
+		// 	assert(!eval_context_predecessor.is_evaluator_value_infinite(distance_learning_evaluator.get()));
+		// 	assert(!eval_context.is_evaluator_value_infinite(distance_learning_evaluator.get()));
+		// 	const auto predecessor_d = eval_context_predecessor.get_evaluator_value(distance_learning_evaluator.get());
+		// 	const auto new_d = eval_context.get_evaluator_value(distance_learning_evaluator.get()) + 1;
+		// 	if (new_d > predecessor_d)
+		// 		// NOTE: no need to check base evaluator, as values are only increased
+		// 		distance_learning_evaluator->update_value(predecessor, new_d, false);
+		// }
 	}
 	ENDF(__func__);
 }
@@ -136,6 +136,7 @@ size_t DijkstraBackup::remaining()
 
 }
 
+#undef TRACKDB
 #undef BEGINF
 #undef ENDF
 #undef TRACKP

@@ -124,6 +124,9 @@ void OnlineRiskLookaheadSearch::generate_tlas(GlobalState const &current_state)
 		auto const op = task_proxy.get_operators()[op_id];
 		auto const succ_state = state_registry.get_successor_state(current_state, op);
 		auto succ_node = search_space->get_node(succ_state);
+		if (store_exploration_data)
+			predecessors[succ_state.get_id()].emplace_back(current_state.get_id(), op);
+
 		if (succ_node.is_new())
 			succ_node.open(root_node, op, op.get_cost());
 		else if (!succ_node.is_dead_end() && op.get_cost() < succ_node.get_g())
@@ -169,7 +172,7 @@ void OnlineRiskLookaheadSearch::generate_tlas(GlobalState const &current_state)
 
 void OnlineRiskLookaheadSearch::initialize(const GlobalState &initial_state)
 {
-	BEGINF(__func__);
+	//BEGINF(__func__);
 	LookaheadSearch::initialize(initial_state);
 
 	// generate top level actions
@@ -181,12 +184,12 @@ void OnlineRiskLookaheadSearch::initialize(const GlobalState &initial_state)
 	if (store_exploration_data)
 		closed.emplace(initial_state.get_id());
 
-	ENDF(__func__);
+	//ENDF(__func__);
 }
 
 double OnlineRiskLookaheadSearch::risk_analysis(size_t const alpha, const vector<DiscreteDistribution> &squished_beliefs) const
 {
-	BEGINF(__func__);
+	//BEGINF(__func__);
 	double risk = 0.0;
 
 	// integrate over probability nodes in alpha's belief
@@ -206,14 +209,14 @@ double OnlineRiskLookaheadSearch::risk_analysis(size_t const alpha, const vector
 			}
 		}
 	}
-	ENDF(__func__);
+	//ENDF(__func__);
 	return risk;
 }
 
 // select the tla with the minimal expected risk
 size_t OnlineRiskLookaheadSearch::select_tla()
 {
-	BEGINF(__func__);
+	//BEGINF(__func__);
 	size_t res = 0;
 	double min_risk = numeric_limits<double>::infinity();
 
@@ -221,7 +224,6 @@ size_t OnlineRiskLookaheadSearch::select_tla()
 	//double alpha_cost = tlas.beliefs[0].expectedCost();
 	double alpha_cost = tlas.expected_min_costs[0];
 
-	TRACKP("finding alpha");
 	for (size_t i = 1; i < tlas.size(); ++i) {
 		if (tlas.expected_min_costs[i] < alpha_cost) {
 			alpha_cost = tlas.expected_min_costs[i];
@@ -231,7 +233,6 @@ size_t OnlineRiskLookaheadSearch::select_tla()
 
 
 	for (size_t i = 0; i < tlas.size(); ++i) {
-		TRACKP("tla risk loop");
 		if (tlas.open_lists[i]->empty()) {
 			continue;
 		}
@@ -273,7 +274,7 @@ size_t OnlineRiskLookaheadSearch::select_tla()
 			}
 		}
 	}
-	ENDF(__func__);
+	//ENDF(__func__);
 
 	return res;
 }
@@ -309,7 +310,6 @@ void OnlineRiskLookaheadSearch::backup_beliefs()
 
 SearchStatus OnlineRiskLookaheadSearch::step()
 {
-	BEGINF(__func__);
 	if (tlas.size() == 0u)
 		return FAILED;
 
@@ -318,12 +318,10 @@ SearchStatus OnlineRiskLookaheadSearch::step()
 	backup_beliefs();
 
  get_node:
-	TRACKP("selecting tla");
 	int tla_id = select_tla();
 	if (tlas.open_lists[tla_id]->empty())
 		return FAILED;
 
-	TRACKP("getting state to expand");
 	// get the state to expand, discarding states that are not owned
 	StateID state_id = tlas.open_lists[tla_id]->remove_min();
 	while (1) {
@@ -354,7 +352,6 @@ SearchStatus OnlineRiskLookaheadSearch::step()
 	if (heuristic_error)
 		heuristic_error->set_expanding_state(state);
 
-	TRACKP("doing expansion");
 	for (auto op_id : applicables) {
 		const auto op = task_proxy.get_operators()[op_id];
 		const auto succ_state = state_registry.get_successor_state(state, op);

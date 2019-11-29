@@ -1,5 +1,18 @@
 #include "nancy_backup.h"
 
+// #define TRACKNB
+
+#ifdef TRACKNB
+#define BEGINF(X) std::cout << "NB: ENTER: " << X << "\n";
+#define ENDF(X) std::cout << "NB: EXIT: " << X << "\n";
+#define TRACKP(X) std::cout << "NB: " << X << "\n";
+#else
+#define BEGINF(X)
+#define ENDF(X)
+#define TRACKP(X)
+#endif
+
+
 namespace real_time
 {
 
@@ -116,3 +129,8 @@ size_t NancyBackup::remaining()
 }
 
 }
+
+#undef TRACKNB
+#undef BEGINF
+#undef ENDF
+#undef TRACKP
