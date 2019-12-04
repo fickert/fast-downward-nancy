@@ -73,7 +73,10 @@ SearchStatus SearchCtrl::search()
 	case TIMEOUT:       return TIMEOUT;
 	}
 
+#ifdef __GNUC__
 	__builtin_unreachable();
+#endif
+	utils::exit_with(utils::ExitCode::SEARCH_CRITICAL_ERROR);
 }
 
 

@@ -21,7 +21,10 @@ DataFeature read_data_feat(std::stringstream &s, DataFeatureKind k)
     return DataFeature(a,b);
   }
   assert(false);
+#ifdef __GNUC__
   __builtin_unreachable();
+#endif
+  utils::exit_with(utils::ExitCode::SEARCH_CRITICAL_ERROR);
 }
 
 DataFeature goal_feature(DataFeatureKind k)
@@ -40,7 +43,10 @@ bool DataFeature::operator==(DataFeature const &other) const
     return h == other.h && ph == other.ph;
   }
   assert(false);
+#ifdef __GNUC__
   __builtin_unreachable();
+#endif
+  utils::exit_with(utils::ExitCode::SEARCH_CRITICAL_ERROR);
 }
 
 int DataFeature::operator-(DataFeature const &o) const
@@ -53,7 +59,10 @@ int DataFeature::operator-(DataFeature const &o) const
     return std::abs(h-o.h) + std::abs(ph-o.ph);
   }
   assert(false);
+#ifdef __GNUC__
   __builtin_unreachable();
+#endif
+  utils::exit_with(utils::ExitCode::SEARCH_CRITICAL_ERROR);
 }
 
 std::ostream &operator<<(std::ostream &out, DataFeature const &x)

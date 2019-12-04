@@ -162,8 +162,8 @@ DiscreteDistribution *BeliefStore<CountT>::get_distribution(DataFeature const &d
 	return res;
 }
 
-template class BeliefStore<int>;
-template class BeliefStore<long long>;
+template struct BeliefStore<int>;
+template struct BeliefStore<long long>;
 
 }
 
