@@ -34,12 +34,12 @@ using lmcut as the heuristic and an expansion bound of 100.
         /path/to/domain.pddl \
         /path/to/instance.pddl \
         --search "real_time(h=lmcut(),
-    	                    cost_type=NORMAL,
-    						lookahead_bound=100,
-    						rtbound_type=EXPANSIONS,
-    						lookahead_search=A_STAR,
-    						decision_strategy=MINIMIN,
-    						learning=DIJKSTRA)"
+                            cost_type=NORMAL,
+                            lookahead_bound=100,
+                            rtbound_type=EXPANSIONS,
+                            lookahead_search=A_STAR,
+                            decision_strategy=MINIMIN,
+                            learning=DIJKSTRA)"
 
 This next call runs assumption-based Nancy with an expansion bound of
 1000.
