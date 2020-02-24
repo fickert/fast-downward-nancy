@@ -68,9 +68,9 @@ ShiftedDistribution RiskLookaheadSearch::get_belief(EvaluationContext &eval_cont
 		// this should never happen if we're using the data-driven approach
 		++post_expansion_belief_gaussian_fallback_count;
 		double ds = 1 / expansion_delay->get_avg_expansion_delay();
-		auto eval_context = EvaluationContext(state_registry.lookup_state(state.get_id()), -1, false, nullptr);
-		assert(!eval_context.is_evaluator_value_infinite(distance_heuristic.get()));
-		double dy = eval_context.get_evaluator_value(distance_heuristic.get());
+		auto eval_context2 = EvaluationContext(state_registry.lookup_state(state.get_id()), -1, false, nullptr);
+		assert(!eval_context2.is_evaluator_value_infinite(distance_heuristic.get()));
+		double dy = eval_context2.get_evaluator_value(distance_heuristic.get());
 		double squishFactor = std::min(1.0, (ds / dy));
 		// needs to be a copy, because these are separate distributions
 		post_distribution = new DiscreteDistribution(distribution);
