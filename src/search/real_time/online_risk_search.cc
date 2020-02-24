@@ -391,31 +391,6 @@ void OnlineRiskLookaheadSearch::post()
 void OnlineRiskLookaheadSearch::print_statistics() const {
 	std::cout << "Fallback to gaussian (node belief): " << hstar_gaussian_fallback_count << std::endl;
 	std::cout << "Fallback to gaussian (post-expansion belief): " << post_expansion_belief_gaussian_fallback_count << std::endl;
-	// if (collect_dparms) {
-	//   auto out = std::ofstream("dparms.txt");
-	//   std::vector<std::pair<int, DParms>> sorted_out;
-	//   long avgmean = 0;
-	//   long avgd = 0;
-	//   long avgerror = 0;
-	//   for (const auto &[f, parms] : dparms) {
-	//     for (const auto &[mean, d, error] : parms) {
-	//       avgmean += mean;
-	//       avgd += d;
-	//       avgerror += error;
-	//     }
-	//     avgmean /= parms.size();
-	//     avgd /= parms.size();
-	//     avgerror /= parms.size();
-	//     sorted_out.emplace_back(f, DParms(avgmean, avgd, avgerror));
-	//     //out << f << " " << avgmean << " " << avgd << " " << avgerror << "\n";
-	//   }
-	//   std::sort(sorted_out.begin(), sorted_out.end(), [](const auto &a, const auto &b) -> bool { return a.first > b.first; });
-	//   for (const auto &[f, parms] : sorted_out) {
-	//     out << f << " " << parms.mean << " " << parms.d << " " << parms.error << "\n";
-	//   }
-	//   out.close();
-	//   std::cout << "dumped dparms to dparms.txt\n";
-	// }
 }
 
 OnlineRiskLookaheadSearch::OnlineRiskLookaheadSearch(StateRegistry &state_registry,
