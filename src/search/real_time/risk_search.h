@@ -55,7 +55,7 @@ class RiskLookaheadSearch : public LookaheadSearch
 	// this is a hack to detect and prevent a state being expanded
 	// under a tla when there is a different tla that has a shorter
 	// path to that state.
-	std::unordered_map<StateID, std::vector<int> > state_owners;
+	std::unordered_map<StateID, int> state_owners;
 
 	// This is storage for applicable operators
 	// It's kept here in the class because clearing a vector is
@@ -63,10 +63,9 @@ class RiskLookaheadSearch : public LookaheadSearch
 	std::vector<OperatorID> applicables;
 protected:
 	//std::unique_ptr<StateOpenList> create_open_list() const;
-	bool add_state_owner(StateID state_id, int tla_id);
 	void make_state_owner(StateID state_id, int tla_id);
 	bool state_owned_by_tla(StateID state_id, int tla_id) const;
-	double risk_analysis(std::size_t const alpha, const vector<ShiftedDistribution> &beliefs) const;
+	double risk_analysis(std::size_t const alpha, const std::vector<ShiftedDistribution> &beliefs) const;
 	std::size_t select_tla();
 	void backup_beliefs();
 	ShiftedDistribution get_belief(EvaluationContext &context, int ph);

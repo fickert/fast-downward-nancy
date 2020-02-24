@@ -1,17 +1,5 @@
 #include "belief_store.h"
 
-// #define TRACKBLF
-
-#ifdef TRACKBLF
-#define BEGINF(X) std::cout << "BLF: ENTER: " << X << "\n";
-#define ENDF(X) std::cout << "BLF: EXIT: " << X << "\n";
-#define TRACKP(X) std::cout << "BLF: " << X << "\n";
-#else
-#define BEGINF(X)
-#define ENDF(X)
-#define TRACKP(X)
-#endif
-
 namespace real_time
 {
 
@@ -69,9 +57,6 @@ void BeliefStore<CountT>::remember(DataFeature const &df, DiscreteDistribution *
 }
 
 
-// TODO: the comment here isn't right anymore, since we don't
-// do this lazy distribution construction anymore.
-
 // This is the function to get a fresh belief distribution based
 // on some feature.  It takes care of the following cases:
 // - If the distribution for this feature has been computed before,
@@ -86,7 +71,6 @@ void BeliefStore<CountT>::remember(DataFeature const &df, DiscreteDistribution *
 template<typename CountT>
 DiscreteDistribution *BeliefStore<CountT>::get_distribution(DataFeature const &df_in)
 {
-	BEGINF(__func__);
 	DiscreteDistribution *res = nullptr;
 	DiscreteDistribution *raw;
 	int h_in = df_in.h;
@@ -108,7 +92,6 @@ DiscreteDistribution *BeliefStore<CountT>::get_distribution(DataFeature const &d
 	// check if we even have data.  if we don't, we can't go on here,
 	// and the search has to use the gauss fallback.
 	if (data == nullptr) {
-		ENDF(__func__);
 		return nullptr;
 	}
 	auto const &data_ref = *data;
@@ -116,13 +99,10 @@ DiscreteDistribution *BeliefStore<CountT>::get_distribution(DataFeature const &d
 	// else we know we don't have exact data for this
 	// feature.  So we go to the first h below for which
 	// we have data, and take the closest match.
-	TRACKP("didn't find match for data feature " << df_in);
 	int h_adj = h_in;
 	if (static_cast<size_t>(h_in) >= data_ref.size())
 		h_adj = data_ref.size() - 1;
-	TRACKP("h_adj " << h_adj);
 	while (h_adj >= 0) {
-		TRACKP("trying adjusted h " << h_adj);
 		auto const &data_bin = data_ref[h_adj];
 		if (!data_bin.empty()) {
 			// among all feature values for which we have data, find the
@@ -158,7 +138,6 @@ DiscreteDistribution *BeliefStore<CountT>::get_distribution(DataFeature const &d
 	}
 
 	assert(res != nullptr);
-	ENDF(__func__);
 	return res;
 }
 
@@ -166,7 +145,3 @@ template class BeliefStore<int>;
 template class BeliefStore<long long>;
 
 }
-
-#undef BEGINF
-#undef ENDF
-#undef TRACKP

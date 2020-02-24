@@ -2,24 +2,11 @@
 
 #include <iostream>
 
-// #define TRACKRT
-
-#ifdef TRACKRT
-#define BEGINF(X) std::cout << "RT: ENTER: " << X << "\n";
-#define ENDF(X) std::cout << "RT: EXIT: " << X << "\n";
-#define TRACKP(X) std::cout << "RT: " << X << "\n";
-#else
-#define BEGINF(X)
-#define ENDF(X)
-#define TRACKP(X)
-#endif
-
 namespace real_time
 {
 
 void RealTimeSearch::initialize()
 {
-	BEGINF(__func__);
 	assert(heuristic);
 	std::cout << "Conducting real-time search" << std::endl;
 
@@ -38,11 +25,6 @@ void RealTimeSearch::initialize()
 
 	auto node = search_space.get_node(current_state);
 	node.open_initial();
-	ENDF(__func__);
 }
 
 }
-
-#undef BEGINF
-#undef ENDF
-#undef TRACKP

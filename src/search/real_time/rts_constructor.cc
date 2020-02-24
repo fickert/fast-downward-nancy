@@ -20,19 +20,6 @@
 
 #include <iostream>
 
-// #define TRACKRT
-
-#ifdef TRACKRT
-#define BEGINF(X) std::cout << "RT: ENTER: " << X << "\n";
-#define ENDF(X) std::cout << "RT: EXIT: " << X << "\n";
-#define TRACKP(X) std::cout << "RT: " << X << "\n";
-#else
-#define BEGINF(X)
-#define ENDF(X)
-#define TRACKP(X)
-#endif
-
-
 namespace real_time
 {
 
@@ -47,7 +34,6 @@ RealTimeSearch::RealTimeSearch(const options::Options &opts)
 	     BackupMethod(opts.get_enum("learning")),
 	     DecisionStrategy(opts.get_enum("decision_strategy")))
 {
-	BEGINF(__func__);
 	DataFeatureKind f_kind = static_cast<DataFeatureKind>(opts.get_enum("feature_kind"));
 	DataFeatureKind pf_kind = static_cast<DataFeatureKind>(opts.get_enum("post_feature_kind"));
 	if (opts.contains("hstar_data"))
@@ -108,7 +94,7 @@ RealTimeSearch::RealTimeSearch(const options::Options &opts)
 		sc.le = nullptr;
 		break;
 	case BackupMethod::DIJKSTRA:
-		sc.le = std::make_unique<DijkstraBackup>(state_registry, this, dynamic_pointer_cast<LearningEvaluator>(heuristic), dynamic_pointer_cast<LearningEvaluator>(distance_heuristic), sc.lsm != LookaheadSearchMethod::BREADTH_FIRST);
+		sc.le = std::make_unique<DijkstraBackup>(state_registry, this, std::dynamic_pointer_cast<LearningEvaluator>(heuristic), std::dynamic_pointer_cast<LearningEvaluator>(distance_heuristic), sc.lsm != LookaheadSearchMethod::BREADTH_FIRST);
 		break;
 	case BackupMethod::NANCY:
 		auto beliefs = sc.ls->get_beliefs();
@@ -174,7 +160,6 @@ RealTimeSearch::RealTimeSearch(const options::Options &opts)
 	}
 
 	heuristic->notify_initial_state(current_state);
-	ENDF(__func__);
 }
 
 void RealTimeSearch::initialize_optional_features(const options::Options &opts) {
@@ -202,7 +187,3 @@ RealTimeSearch::~RealTimeSearch()
 }
 
 }
-
-#undef BEGINF
-#undef ENDF
-#undef TRACKP

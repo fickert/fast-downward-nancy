@@ -73,8 +73,6 @@ OperatorID OnlineNancyDecider::decide(const std::vector<StateID> &frontier, Sear
 		return next_action;
 	}
 
-
-
 	assert(!plan.empty());
 	return plan.front();
 }

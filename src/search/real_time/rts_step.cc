@@ -2,26 +2,12 @@
 
 #include <iostream>
 
-// #define TRACKRT
-
-#ifdef TRACKRT
-#define BEGINF(X) std::cout << "RT: ENTER: " << X << "\n";
-#define ENDF(X) std::cout << "RT: EXIT: " << X << "\n";
-#define TRACKP(X) std::cout << "RT: " << X << "\n";
-#else
-#define BEGINF(X)
-#define ENDF(X)
-#define TRACKP(X)
-#endif
-
 namespace real_time
 {
 SearchStatus RealTimeSearch::step() {
 	++num_rts_phases;
 	sc.initialize_lookahead(current_state);
-	TRACKP("doing lookahead from " << current_state.get_id());
 	const auto status = sc.search();
-	TRACKP("finished lookahead");
 
 	const SearchStatistics &current_stats = sc.ls->get_statistics();
 	statistics.inc_expanded(current_stats.get_expanded());
@@ -49,13 +35,10 @@ SearchStatus RealTimeSearch::step() {
 	if (sc.ls->get_frontier().empty())
 		return FAILED;
 
-	TRACKP("action selection");
 	OperatorID best_tla = sc.select_action();
 
-	TRACKP("learning/backup");
 	sc.learn_initial();
 
-	TRACKP("execution");
 	const auto parent_node = search_space.get_node(current_state);
 	const auto op = task_proxy.get_operators()[best_tla];
 	solution_cost += get_adjusted_cost(op);
@@ -67,8 +50,3 @@ SearchStatus RealTimeSearch::step() {
 	return IN_PROGRESS;
 }
 }
-
-#undef TRACKRT
-#undef BEGINF
-#undef ENDF
-#undef TRACKP

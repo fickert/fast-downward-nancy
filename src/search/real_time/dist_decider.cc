@@ -1,4 +1,5 @@
 #include "dist_decider.h"
+#include "util.h"
 
 namespace real_time
 {
@@ -33,9 +34,6 @@ OperatorID DistributionDecider::decide(std::vector<StateID> const &frontier, Sea
 		target_f_hat = std::numeric_limits<double>::infinity();
 	}
 
-	// TODO: maybe replace double == comparisons with something
-	// more appropriate
-
 	double min_h = target_h_hat;
 	double min_f = target_f_hat;
 	size_t min_id = 0;
@@ -50,7 +48,7 @@ OperatorID DistributionDecider::decide(std::vector<StateID> const &frontier, Sea
 			continue;
 		} else {
 			const double frontier_h_hat = tlas->states[i].second;
-			if (tla_f_hat == min_f) {
+			if (double_eq(tla_f_hat,  min_f)) {
 				if (frontier_h_hat >= min_h) {
 					continue;
 				} else {
@@ -77,7 +75,7 @@ OperatorID DistributionDecider::decide(std::vector<StateID> const &frontier, Sea
 	if (new_direction) {
 		// build new path
 		target_path.clear();
-		// TODO: could trace only to successor of initial_id to save the pop_back below
+		// Note: could trace only to successor of initial_id to save the pop_back below
 		search_space.trace_path_rev_id_to(tlas->current_state->get_id(), tlas->states[min_id].first, target_path);
 		assert(!target_path.empty());
 		OperatorID next_action = target_path.back();

@@ -8,18 +8,6 @@
 
 #include <iostream>
 
-// #define TRACKRT
-
-#ifdef TRACKRT
-#define BEGINF(X) std::cout << "RT: ENTER: " << X << "\n";
-#define ENDF(X) std::cout << "RT: EXIT: " << X << "\n";
-#define TRACKP(X) std::cout << "RT: " << X << "\n";
-#else
-#define BEGINF(X)
-#define ENDF(X)
-#define TRACKP(X)
-#endif
-
 namespace real_time
 {
 
@@ -72,7 +60,6 @@ static auto _parse(options::OptionParser &parser) -> std::shared_ptr<SearchEngin
 	parser.add_option<std::shared_ptr<Evaluator>>("h", "heuristic");
 	parser.add_option<std::shared_ptr<Evaluator>>("distance_heuristic", "distance heuristic", options::OptionParser::NONE);
 	parser.add_option<int>("lookahead_bound","Lookahead bound in number of expansions.", "100");
-	// TODO: check if the default value here makes any sense.
 	parser.add_option<int>("time_bound","Lookahead bound in milli seconds.", "200");
 	parser.add_enum_option("rtbound_type", {"EXPANSIONS", "TIME"}, "Type of bound the algorithm is running under", "EXPANSIONS");
 	parser.add_enum_option("lookahead_search", {"A_STAR", "A_STAR_COLLECT", "F_HAT", "BREADTH_FIRST", "RISK", "ONLINE_RISK"}, "Lookahead search algorithm", "A_STAR");
@@ -95,7 +82,3 @@ static auto _parse(options::OptionParser &parser) -> std::shared_ptr<SearchEngin
 
 static Plugin<SearchEngine> _plugin("real_time", _parse);
 }
-
-
-#undef BEGINF
-#undef ENDF

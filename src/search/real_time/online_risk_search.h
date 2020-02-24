@@ -34,8 +34,6 @@ struct OnlineTLAs
 	n1    n2     n3 ...
 	*/
 
-	// TODO: not sure if this is smart, setting up all these eval
-	// contexts
 	std::vector<EvaluationContext> eval_contexts;
 
 
@@ -83,7 +81,7 @@ protected:
 	bool state_owned_by_tla(StateID state_id, int tla_id) const;
 	void generate_tlas(GlobalState const &current_state);
 	std::unique_ptr<StateOpenList> create_open_list() const;
-	double risk_analysis(std::size_t const alpha, const vector<DiscreteDistribution> &squished_beliefs) const;
+	double risk_analysis(std::size_t const alpha, const std::vector<DiscreteDistribution> &squished_beliefs) const;
 	std::size_t select_tla();
 	void backup_beliefs();
 	DiscreteDistribution node_belief(SearchNode const &);

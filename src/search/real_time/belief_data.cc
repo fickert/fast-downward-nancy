@@ -10,63 +10,63 @@ DataFeature::DataFeature(DataFeatureKind k, int h, int ph) : kind(k), h(h), ph(p
 
 DataFeature read_data_feat(std::stringstream &s, DataFeatureKind k)
 {
-  int a,b;
-  switch(k) {
-  case JustH:
-    s >> a;
-    return DataFeature(a);
-  case WithParentH:
-    s >> a;
-    s >> b;
-    return DataFeature(a,b);
-  }
-  assert(false);
-  __builtin_unreachable();
+	int a,b;
+	switch(k) {
+	case JustH:
+		s >> a;
+		return DataFeature(a);
+	case WithParentH:
+		s >> a;
+		s >> b;
+		return DataFeature(a,b);
+	}
+	assert(false);
+	__builtin_unreachable();
 }
 
 DataFeature goal_feature(DataFeatureKind k)
 {
-  return DataFeature(k, 0, 1);
+	return DataFeature(k, 0, 1);
 }
 
 bool DataFeature::operator==(DataFeature const &other) const
 {
-  // we shouldn't ever use feature of different kinds in one run
-  assert(this->kind == other.kind);
-  switch(kind) {
-  case JustH:
-    return h == other.h;
-  case WithParentH:
-    return h == other.h && ph == other.ph;
-  }
-  assert(false);
-  __builtin_unreachable();
+	// we shouldn't ever use feature of different kinds in one run
+	assert(this->kind == other.kind);
+	switch(kind) {
+	case JustH:
+		return h == other.h;
+	case WithParentH:
+		return h == other.h && ph == other.ph;
+	}
+	assert(false);
+	__builtin_unreachable();
 }
 
 int DataFeature::operator-(DataFeature const &o) const
 {
-  assert(kind == o.kind);
-  switch (kind) {
-  case real_time::JustH:
-    return std::abs(h-o.h);
-  case real_time::WithParentH:
-    return std::abs(h-o.h) + std::abs(ph-o.ph);
-  }
-  assert(false);
-  __builtin_unreachable();
+	assert(kind == o.kind);
+	switch (kind) {
+	case real_time::JustH:
+		return std::abs(h-o.h);
+	case real_time::WithParentH:
+		return std::abs(h-o.h) + std::abs(ph-o.ph);
+	}
+	assert(false);
+	__builtin_unreachable();
 }
 
 std::ostream &operator<<(std::ostream &out, DataFeature const &x)
 {
-  switch(x.kind) {
-  case JustH:
-    out << "(0, " << x.h << ")";
-    break;
-  case WithParentH:
-    out << "(1, " << x.h << ", " << x.ph << ")";
-    break;
-  }
-  return out;
+	switch(x.kind) {
+	case JustH:
+		out << "(0, " << x.h << ")";
+		break;
+	case WithParentH:
+		out << "(1, " << x.h << ", " << x.ph << ")";
+		break;
+	}
+	return out;
 }
 
 }

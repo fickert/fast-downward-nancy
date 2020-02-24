@@ -12,19 +12,6 @@
 #include "../task_utils/task_properties.h"
 #include "../open_lists/best_first_open_list.h"
 
-// #define TRACKLS
-
-#ifdef TRACKLS
-#define BEGINF(X) std::cout << "LS: ENTER: " << X << "\n";
-#define ENDF(X) std::cout << "LS: EXIT: " << X << "\n";
-#define TRACKP(X) std::cout << "LS: " << X << "\n";
-#else
-#define BEGINF(X)
-#define ENDF(X)
-#define TRACKP(X)
-#endif
-
-
 namespace real_time {
 
 void LookaheadSearch::mark_expanded(SearchNode &node)
@@ -127,8 +114,6 @@ void EagerLookaheadSearch::initialize(const GlobalState &initial_state)
 		if (heuristic_error)
 			heuristic_error->add_successor(succ_node, adj_cost);
 	}
-
-	TRACKP("expanded initial state");
 
 	mark_expanded(root_node);
 	statistics->inc_generated();
@@ -250,8 +235,3 @@ FHatLookaheadSearch::FHatLookaheadSearch(StateRegistry &state_registry, std::sha
 static options::PluginTypePlugin<LookaheadSearch> _type_plugin("LookaheadSearch", "Lookahead search engine for real-time search");
 
 }
-
-#undef TRACKLS
-#undef BEGINF
-#undef ENDF
-#undef TRACKP

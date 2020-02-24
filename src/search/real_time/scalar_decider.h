@@ -1,9 +1,7 @@
 #ifndef REAL_TIME_SCALAR_DECISION_H
 #define REAL_TIME_SCALAR_DECISION_H
 
-
 #include <functional>
-
 #include "decision.h"
 
 namespace real_time

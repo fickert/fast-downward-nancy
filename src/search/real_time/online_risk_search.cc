@@ -3,22 +3,11 @@
 #include "expansion_delay.h"
 #include "heuristic_error.h"
 #include "util.h"
+#include "../evaluators/g_evaluator.h"
+#include "../evaluators/sum_evaluator.h"
 #include "../open_lists/tiebreaking_open_list.h"
 #include "../options/plugin.h"
 #include "../task_utils/task_properties.h"
-
-// #define TRACKORISK
-
-#ifdef TRACKORISK
-#define BEGINF(X) std::cout << "ORISK: ENTER: " << X << "\n";
-#define ENDF(X) std::cout << "ORISK: EXIT: " << X << "\n";
-#define TRACKP(X) std::cout << "ORISK: " << X << "\n";
-#else
-#define BEGINF(X)
-#define ENDF(X)
-#define TRACKP(X)
-#endif
-
 
 namespace real_time
 {
@@ -37,9 +26,9 @@ bool OnlineRiskLookaheadSearch::state_owned_by_tla(StateID state_id, int tla_id)
 {
 	const auto owner = state_owner.find(state_id);
 	if (owner == state_owner.end()) {
-		assert(false);
 		// this should never happen
-		// TODO: print error
+		std::cerr << "Encountered state with no known owner\n";
+		assert(false);
 		return false;
 	}
 	if (owner->second != tla_id) {
@@ -76,7 +65,7 @@ void OnlineRiskLookaheadSearch::post_expansion_belief(StateID best_state_id, Dis
 	auto best_state_eval_context = EvaluationContext(state_registry.lookup_state(best_state_id), -1, false, nullptr);
 	assert(!best_state_eval_context.is_evaluator_value_infinite(distance_heuristic.get()));
 	double dy = best_state_eval_context.get_evaluator_value(distance_heuristic.get());
-	double squishFactor = min(1.0, (ds / dy));
+	double squishFactor = std::min(1.0, (ds / dy));
 	current_belief.squish(squishFactor);
 }
 
@@ -120,7 +109,7 @@ void OnlineRiskLookaheadSearch::generate_tlas(GlobalState const &current_state)
 	successor_generator.generate_applicable_ops(current_state, ops);
 	auto root_node = search_space->get_node(current_state);
 
-	for (auto op_id : ops) {
+	for (auto const op_id : ops) {
 		auto const op = task_proxy.get_operators()[op_id];
 		auto const succ_state = state_registry.get_successor_state(current_state, op);
 		auto succ_node = search_space->get_node(succ_state);
@@ -172,7 +161,6 @@ void OnlineRiskLookaheadSearch::generate_tlas(GlobalState const &current_state)
 
 void OnlineRiskLookaheadSearch::initialize(const GlobalState &initial_state)
 {
-	//BEGINF(__func__);
 	LookaheadSearch::initialize(initial_state);
 
 	// generate top level actions
@@ -183,13 +171,10 @@ void OnlineRiskLookaheadSearch::initialize(const GlobalState &initial_state)
 
 	if (store_exploration_data)
 		closed.emplace(initial_state.get_id());
-
-	//ENDF(__func__);
 }
 
-double OnlineRiskLookaheadSearch::risk_analysis(size_t const alpha, const vector<DiscreteDistribution> &squished_beliefs) const
+double OnlineRiskLookaheadSearch::risk_analysis(size_t const alpha, const std::vector<DiscreteDistribution> &squished_beliefs) const
 {
-	//BEGINF(__func__);
 	double risk = 0.0;
 
 	// integrate over probability nodes in alpha's belief
@@ -209,19 +194,16 @@ double OnlineRiskLookaheadSearch::risk_analysis(size_t const alpha, const vector
 			}
 		}
 	}
-	//ENDF(__func__);
 	return risk;
 }
 
 // select the tla with the minimal expected risk
 size_t OnlineRiskLookaheadSearch::select_tla()
 {
-	//BEGINF(__func__);
 	size_t res = 0;
-	double min_risk = numeric_limits<double>::infinity();
+	double min_risk = std::numeric_limits<double>::infinity();
 
 	size_t alpha = 0;
-	//double alpha_cost = tlas.beliefs[0].expectedCost();
 	double alpha_cost = tlas.expected_min_costs[0];
 
 	for (size_t i = 1; i < tlas.size(); ++i) {
@@ -230,7 +212,6 @@ size_t OnlineRiskLookaheadSearch::select_tla()
 			alpha = i;
 		}
 	}
-
 
 	for (size_t i = 0; i < tlas.size(); ++i) {
 		if (tlas.open_lists[i]->empty()) {
@@ -247,7 +228,7 @@ size_t OnlineRiskLookaheadSearch::select_tla()
 		if (risk < min_risk) {
 			min_risk = risk;
 			res = i;
-		} else if (risk == min_risk) {
+		} else if (double_eq(risk, min_risk)) {
 			auto &eval_context = tlas.eval_contexts[i];
 			auto &min_eval_context = tlas.eval_contexts[res];
 			int min_f_hat = min_eval_context.get_evaluator_value_or_infinity(f_hat_evaluator.get());
@@ -274,7 +255,6 @@ size_t OnlineRiskLookaheadSearch::select_tla()
 			}
 		}
 	}
-	//ENDF(__func__);
 
 	return res;
 }
@@ -286,7 +266,7 @@ void OnlineRiskLookaheadSearch::backup_beliefs()
 		// list that is owned by the tla
 		while (1) {
 			if (tlas.open_lists[tla_id]->empty()) {
-				tlas.expected_min_costs[tla_id] = numeric_limits<double>::infinity();
+				tlas.expected_min_costs[tla_id] = std::numeric_limits<double>::infinity();
 				break;
 			}
 
@@ -314,10 +294,9 @@ SearchStatus OnlineRiskLookaheadSearch::step()
 		return FAILED;
 
 	// setup work: find tla to expand under
-	TRACKP("updating beliefs");
 	backup_beliefs();
 
- get_node:
+get_node:
 	int tla_id = select_tla();
 	if (tlas.open_lists[tla_id]->empty())
 		return FAILED;
@@ -464,8 +443,3 @@ OnlineRiskLookaheadSearch::OnlineRiskLookaheadSearch(StateRegistry &state_regist
 	state_owner.reserve(256);
 }
 }
-
-#undef TRACKRISK
-#undef TRACKP
-#undef BEGINF
-#undef ENDF

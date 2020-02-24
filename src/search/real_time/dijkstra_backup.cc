@@ -1,19 +1,6 @@
 #include "dijkstra_backup.h"
 #include "../evaluation_context.h"
 
-// #define TRACKDB
-
-#ifdef TRACKDB
-#define BEGINF(X) std::cout << "DB: ENTER: " << X << "\n";
-#define ENDF(X) std::cout << "DB: EXIT: " << X << "\n";
-#define TRACKP(X) std::cout << "DB: " << X << "\n";
-#else
-#define BEGINF(X)
-#define ENDF(X)
-#define TRACKP(X)
-#endif
-
-
 namespace real_time
 {
 
@@ -26,14 +13,11 @@ void DijkstraBackup::initialize(const std::unordered_map<StateID, std::vector<st
 	const std::vector<StateID> &frontier,
 	std::unordered_set<StateID> &closed_)
 {
-	TRACKP("setting predecessors and closed");
 	predecessors = &predecessors_;
 	closed = &closed_;
-	TRACKP("getting initial effort");
 	initial_effort = closed->size();
 
 	if (h_before) {
-		TRACKP("computing h before");
 		// ensure the heuristic values are cached for all states
 		const auto evaluate = [this](const auto &state_id) {
 			auto state = state_registry.lookup_state(state_id);
@@ -49,11 +33,9 @@ void DijkstraBackup::initialize(const std::unordered_map<StateID, std::vector<st
 	}
 
 
-	TRACKP("iterating over closed");
 	for (const auto &state_id : (*closed))
 		learning_evaluator->update_value(state_registry.lookup_state(state_id), EvaluationResult::INFTY);
 
-	TRACKP("iterating over frontier");
 	for (const auto &state_id : frontier) {
 		auto state = state_registry.lookup_state(state_id);
 		assert(learning_evaluator->is_estimate_cached(state));
@@ -65,7 +47,6 @@ void DijkstraBackup::initialize(const std::unordered_map<StateID, std::vector<st
 
 void DijkstraBackup::step()
 {
-	BEGINF(__func__);
 	assert(!done());
 
  get_entry:
@@ -103,19 +84,7 @@ void DijkstraBackup::step()
 			learning_evaluator->update_value(predecessor, new_h, true);
 			learning_queue.emplace(new_h, predecessor_id);
 		}
-		// if (distance_learning_evaluator) {
-		// 	auto eval_context_predecessor = EvaluationContext(predecessor, 0, true, nullptr);
-		// 	auto eval_context = EvaluationContext(state, 0, true, nullptr);
-		// 	assert(!eval_context_predecessor.is_evaluator_value_infinite(distance_learning_evaluator.get()));
-		// 	assert(!eval_context.is_evaluator_value_infinite(distance_learning_evaluator.get()));
-		// 	const auto predecessor_d = eval_context_predecessor.get_evaluator_value(distance_learning_evaluator.get());
-		// 	const auto new_d = eval_context.get_evaluator_value(distance_learning_evaluator.get()) + 1;
-		// 	if (new_d > predecessor_d)
-		// 		// NOTE: no need to check base evaluator, as values are only increased
-		// 		distance_learning_evaluator->update_value(predecessor, new_d, false);
-		// }
 	}
-	ENDF(__func__);
 }
 
 bool DijkstraBackup::done()
@@ -135,8 +104,3 @@ size_t DijkstraBackup::remaining()
 
 
 }
-
-#undef TRACKDB
-#undef BEGINF
-#undef ENDF
-#undef TRACKP

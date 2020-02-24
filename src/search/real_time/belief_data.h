@@ -18,13 +18,13 @@ namespace real_time
 
 enum DataFeatureKind
 {
- JustH,
- WithParentH,
+	JustH,
+	WithParentH,
 };
 
 enum Constants
 {
- MAX_SAMPLES = 64,
+	MAX_SAMPLES = 64,
 };
 
 // the struct to collect all possible feature values.  think of it
