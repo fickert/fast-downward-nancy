@@ -15,8 +15,9 @@ The general workflow is as follows:
 
 ## 1. Generating Instances
 
-Nancy requires data for each individual domain.  The script
-make\_training\_instances.sh is a bash script that automates this
+Nancy requires data for each individual domain.  Hence, we need to
+generate training instances of each domain.  The script
+**make\_training\_instances.sh** is a bash script that automates this
 process.  Ideally, you should just be able to run it.  The generators
 are implemented in C, C++, Python, Perl, Clojure/Java.  To be able to
 run all generators, make sure that the required runtimes are installed
@@ -25,12 +26,13 @@ rewrite in C, which hasn't been tested however and is not guaranteed
 to be equivalent.  To try it, replace the call to tidybot-1.0.1.jar
 with a call to tidy.)
 
-The script compiles all generators that need to be compiled, and then
-generates the instances.  The parameters given to the instance
-generators were chosen to be as close as possible to the ones used in
-the IPC, since we want instances that are as similar as possible.  If
-the generator accepts a random seed however, we use a different one,
-since we don't want exactly the same instances as the IPC.
+The script uses the Makefile to compile all generators that need to be
+compiled, and then generates the instances.  The parameters given to
+the instance generators were chosen to be as close as possible to the
+ones used in the IPC, since we want instances that are as similar as
+possible.  If the generator accepts a random seed however, we use a
+different one, since we don't want exactly the same instances as the
+IPC.
 
 When called without any parameters, the script generates instances for
 all domains.  To (re-)generate instances for a subset of domains,
@@ -107,12 +109,12 @@ writing and would have to be implemented first.
 
 The data generated in the previous step comes in the form of (h,h*)
 samples.  Nancy expects them to be aggregated in a histogram format
-first.  Use the combine\_hstar.py script for this.  As a parameter, it
+first.  Use the **combine\_hstar.py** script for this.  As a parameter, it
 expects the path to the directory containing the raw hstar data files.
 The aggregated beliefs are printed to stdout (and can be redirected to
 a file for example).  If collect\_parent\_h was set to true, use
 combine\_phstar.py instead.  To aggregate data for the
-post\_expansion\_belief, use combine\_post.py.  It requires both the
+post\_expansion\_belief, use **combine\_post.py**.  It requires both the
 path to the directory containing raw post data files, and the path to
 the hstar file that was generated with combine_hstar.  Using data for
 the post expansion belief that takes the parent h into account is
