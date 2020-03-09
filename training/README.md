@@ -8,7 +8,7 @@ process.
 The general workflow is as follows:
 
 1. Generate training instances
-2. Run a *compute_hstar* or *rt_solve_all* search on these instances
+2. Run a *compute\_hstar* or *rt\_solve\_all* search on these instances
    to solve some states optimally, generating (h,h\*) samples.
 3. Convert the data generated in step 2 into the format used by Nancy.
 
@@ -62,7 +62,7 @@ variant of the search.
                                 hstar_file=hstar_values_for_instance.txt,
                                 successors_file=successor_values_for_instance.txt)"
 
-This runs weighted A* with a weight of w=2 on the given instance.  The
+This runs weighted A\* with a weight of w=2 on the given instance.  The
 relevant parameters here are max\_time which is the maximum time in
 seconds after which the algorithm is terminated, and reserved_time
 which is the time in seconds reserved to just dumping the values to a
@@ -107,7 +107,7 @@ writing and would have to be implemented first.
 
 ## 3 Data Conversion
 
-The data generated in the previous step comes in the form of (h,h*)
+The data generated in the previous step comes in the form of (h,h\*)
 samples.  Nancy expects them to be aggregated in a histogram format
 first.  Use the **combine\_hstar.py** script for this.  As a parameter, it
 expects the path to the directory containing the raw hstar data files.
