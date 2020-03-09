@@ -53,12 +53,12 @@ variant of the search.
         /path/to/instance.pddl \
         --search "compute_hstar(h=lmcut(),
                                 cost_type=NORMAL,
-								collect_parent_h=false,
-								w=2,
+                                collect_parent_h=false,
+                                w=2,
                                 max_time=46800,
-								reserved_time=3600,
-								hstar_file=hstar_values_for_instance.txt,
-								successors_file=successor_values_for_instance.txt)"
+                                reserved_time=3600,
+                                hstar_file=hstar_values_for_instance.txt,
+                                successors_file=successor_values_for_instance.txt)"
 
 This runs weighted A* with a weight of w=2 on the given instance.  The
 relevant parameters here are max\_time which is the maximum time in
@@ -83,17 +83,17 @@ Here is an example call that runs LSS-LRTA\* as the initial search.
         /path/to/domain.pddl \
         /path/to/instance.pddl \
         --search "rt_solve_all(real_time(h=lmcut(),
-		                                 distance_heuristic=lmcut(transform=adapt_costs(cost_type=1)),
-										 lookahead_search=A_STAR_COLLECT,
-										 lookahead_bound=100,
-										 decision_strategy=MINIMIN
-										 learning=DIJKSTRA),
+                                         distance_heuristic=lmcut(transform=adapt_costs(cost_type=1)),
+                                         lookahead_search=A_STAR_COLLECT,
+                                         lookahead_bound=100,
+                                         decision_strategy=MINIMIN
+                                         learning=DIJKSTRA),
                                cost_type=NORMAL,
-							   w=2,
+                               w=2,
                                max_time=46800,
-							   reserved_time=3600,
-							   hstar_file=hstar_values_for_instance.txt,
-							   successors_file=successor_values_for_instance.txt)"
+                               reserved_time=3600,
+                               hstar_file=hstar_values_for_instance.txt,
+                               successors_file=successor_values_for_instance.txt)"
 
 To use an algorithm as the initial search algorithm in this training
 step, it needs to be a search engine that implements
