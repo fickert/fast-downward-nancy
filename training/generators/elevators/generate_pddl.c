@@ -15,7 +15,7 @@
 #define STOP_FAST_COST 1
 #define SLOW_SPEED 8			// This it the time needed to travel one floor distance (i.e. the inverse of speed)
 #define FAST_ACCELERATION 0.2	// This is the acceleration, i.e. how much changes the speed per second, provided that the distance between two adjacent floors equals 1.
-#define DOORS_DELAY 4			
+#define DOORS_DELAY 4
 
 int Numbers;
 
@@ -45,7 +45,7 @@ char *itoa(int i, char* s, int dummy_radix) {
 
 int max(int a, int b)
 {
-	if (a>b) 
+	if (a>b)
 		return a;
 	else
 		return b;
@@ -56,18 +56,18 @@ FILE *infile, *outfile;
 int read_input(char* filename)
 {
 	int i,j;
-	infile =fopen(filename,"r"); 
+	infile =fopen(filename,"r");
 	fscanf(infile,"%d %d %d %d %d %d %d\n", &FLOORS, &AREA_SIZE, &FAST_ELEVATORS, &SLOW_ELEVATORS, &FAST_CAPACITY, &SLOW_CAPACITY, &passengers);
-	
+
 	STEP_SIZE=(int) (AREA_SIZE+0.0001)/2;
-	
+
 	for(i=0;i<FAST_ELEVATORS; i++)
 		fscanf(infile, "%d", &fast_elevators[i]);
-	
+
 	for(i=0;i<FLOORS/AREA_SIZE;i++)
 		for(j=0;j<SLOW_ELEVATORS;j++)
 			fscanf(infile, "%d", &(slow_elevators[i][j]));
-	
+
 	for(i=0;i<passengers;i++)
 		fscanf(infile, "%d %d",&origin[i], &destination[i]);
 
@@ -111,7 +111,7 @@ void generate_problem(char *filename, int instance)
 
 	fprintf(outfile,"\n(:objects \n");
 
-	if (numeric==0) 
+	if (numeric==0)
 		{for(i=0;i<=Numbers;i++) fprintf(outfile,"n%d ",i); fprintf(outfile," - count\n");}
 	else
 		{for(i=0;i<=FLOORS;i++) fprintf(outfile,"f%d ",i); fprintf(outfile," - floor\n");}
@@ -125,24 +125,24 @@ void generate_problem(char *filename, int instance)
 	fprintf(outfile,")\n");
 
 	fprintf(outfile,"\n(:init\n");
-	
+
 	if (numeric==0)
 	{
-		for(i=0;i<Numbers;i++) fprintf(outfile,"(next n%d n%d) ", i, i+1); 
+		for(i=0;i<Numbers;i++) fprintf(outfile,"(next n%d n%d) ", i, i+1);
 		fprintf(outfile,"\n\n");
-	}	
+	}
 
 	for(i=0;i<FLOORS;i++)
 	{
 		for(j=i+1;j<=FLOORS;j++)
 			if (numeric==0)
-				fprintf(outfile,"(above n%d n%d) ", i, j); 
+				fprintf(outfile,"(above n%d n%d) ", i, j);
 			else
-				fprintf(outfile,"(above f%d f%d) ", i, j); 
-		fprintf(outfile,"\n"); 
+				fprintf(outfile,"(above f%d f%d) ", i, j);
+		fprintf(outfile,"\n");
 	}
-	fprintf(outfile,"\n"); 
-	
+	fprintf(outfile,"\n");
+
 
 	for(i=0;i<FAST_ELEVATORS;i++)
 	{
@@ -154,7 +154,7 @@ void generate_problem(char *filename, int instance)
 			fprintf(outfile, "(passengers fast%d n0)\n",i);
 		else
 			fprintf(outfile, "(= (passengers fast%d) 0)\n",i);
-		
+
 		if (numeric==1)
 			fprintf(outfile, "(= (capacity fast%d) %d)\n",i,FAST_CAPACITY);
 		else
@@ -214,33 +214,33 @@ void generate_problem(char *filename, int instance)
 			for(j=i+1;j<=(k+1)*AREA_SIZE;j++)
 				if (temporal==0)
 					if (numeric==0)
-						fprintf(outfile,"(= (travel-slow n%d n%d) %d) ", i, j,STOP_SLOW_COST+SLOW_COST*(j-i)); 
+						fprintf(outfile,"(= (travel-slow n%d n%d) %d) ", i, j,STOP_SLOW_COST+SLOW_COST*(j-i));
 					else
-						fprintf(outfile,"(= (travel-slow f%d f%d) %d) ", i, j,STOP_SLOW_COST+SLOW_COST*(j-i)); 
+						fprintf(outfile,"(= (travel-slow f%d f%d) %d) ", i, j,STOP_SLOW_COST+SLOW_COST*(j-i));
 				else
 					if (numeric==0)
-						fprintf(outfile,"(= (travel-slow n%d n%d) %d) ", i, j,DOORS_DELAY + SLOW_SPEED * (j-i)); 
+						fprintf(outfile,"(= (travel-slow n%d n%d) %d) ", i, j,DOORS_DELAY + SLOW_SPEED * (j-i));
 					else
-						fprintf(outfile,"(= (travel-slow f%d f%d) %d) ", i, j,DOORS_DELAY + SLOW_SPEED * (j-i)); 
+						fprintf(outfile,"(= (travel-slow f%d f%d) %d) ", i, j,DOORS_DELAY + SLOW_SPEED * (j-i));
 		}
-		fprintf(outfile,"\n\n"); 
+		fprintf(outfile,"\n\n");
 	}
-	fprintf(outfile,"\n"); 
+	fprintf(outfile,"\n");
 
 	for(i=0;i<Numbers;i+=STEP_SIZE)
 	{
 		for(j=i+STEP_SIZE;j<=Numbers;j+=STEP_SIZE)
 			if (temporal==0)
 				if (numeric==0)
-					fprintf(outfile,"(= (travel-fast n%d n%d) %d) ", i, j,STOP_FAST_COST+FAST_COST*(j-i)); 
+					fprintf(outfile,"(= (travel-fast n%d n%d) %d) ", i, j,STOP_FAST_COST+FAST_COST*(j-i));
 				else
-					fprintf(outfile,"(= (travel-fast f%d f%d) %d) ", i, j,STOP_FAST_COST+FAST_COST*(j-i)); 
+					fprintf(outfile,"(= (travel-fast f%d f%d) %d) ", i, j,STOP_FAST_COST+FAST_COST*(j-i));
 			else
 				if (numeric==0)
-					fprintf(outfile,"(= (travel-fast n%d n%d) %d) ", i, j,DOORS_DELAY + ceiling(2*sqrt((j-i)/FAST_ACCELERATION))); 
+					fprintf(outfile,"(= (travel-fast n%d n%d) %d) ", i, j,DOORS_DELAY + ceiling(2*sqrt((j-i)/FAST_ACCELERATION)));
 				else
-					fprintf(outfile,"(= (travel-fast f%d f%d) %d) ", i, j,DOORS_DELAY + ceiling(2*sqrt((j-i)/FAST_ACCELERATION))); 
-		fprintf(outfile,"\n\n"); 
+					fprintf(outfile,"(= (travel-fast f%d f%d) %d) ", i, j,DOORS_DELAY + ceiling(2*sqrt((j-i)/FAST_ACCELERATION)));
+		fprintf(outfile,"\n\n");
 	}
 
 	if (temporal==0)
@@ -249,7 +249,7 @@ void generate_problem(char *filename, int instance)
 	fprintf(outfile,")\n\n");
 
 	fprintf(outfile,"(:goal\n(and\n");
-	
+
 	for (i=0;i<passengers;i++)
 	{
 		if (net_benefit==1)
@@ -311,33 +311,33 @@ int main(int argc, char** argv) {
 			{
 				strcpy(infilename,"p");
 				strcpy(problemfilename,"p");
-				
+
 				itoa(i,temps,10);
 				strcat(infilename,temps);
 				strcat(problemfilename,temps);
-				
+
 				strcat(infilename,"_");
 				strcat(problemfilename,"_");
-				
+
 				itoa(j,temps,10);
 				strcat(infilename,temps);
 				strcat(problemfilename,temps);
-				
+
 				strcat(infilename,"_");
 				strcat(problemfilename,"_");
-				
+
 				itoa(k,temps,10);
 				strcat(infilename,temps);
 				strcat(problemfilename,temps);
-				
+
 				strcat(infilename,".txt");
 				strcat(problemfilename,".pddl");
-				
+
 				printf("reading infilename: %s\n", infilename);
 				read_input(infilename);
-					
+
 				printf("generating problem\n");
 				generate_problem(problemfilename, k);
 			}
-	return 1;
+	return 0;
 }

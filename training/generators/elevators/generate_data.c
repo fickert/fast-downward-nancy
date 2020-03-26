@@ -62,7 +62,7 @@ int main(int argc, char **argv)
 			strcat(filename,".txt");
 			generate_problem(passengers,filename);
 		}
-	return 1;
+	return 0;
 }
 
 int generate_problem(int passengers, char *filename)
@@ -90,7 +90,7 @@ int generate_problem(int passengers, char *filename)
 		}
 		fprintf(outfile,"\n");
 	}
-	
+
 	for(i=0;i<passengers;i++)
 	{
 		int r1, r2;
