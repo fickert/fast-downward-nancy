@@ -2,7 +2,7 @@
 
 import argparse
 from collections import defaultdict
-from z3 import Int, Bool, Optimize, Implies, Or, And, Sum
+from z3.z3 import Int, Bool, Optimize, Implies, Or, And, Sum
 from copy import deepcopy
 
 def get_location (x, y):
