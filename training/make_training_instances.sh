@@ -180,7 +180,7 @@ fi
 
 if [[ -v "selections[all]" || -v "selections[termes]" ]]; then
 	echo "Generating termes instances"
-	pip3 install --user z3 > /dev/null
+	pip3 install --user z3 z3-solver > /dev/null
 	mkdir -p "${outdir}/termes"
 	cp "./generators/termes/domain.pddl" "${outdir}/termes/domain.pddl"
 	mkdir -p "./generators/termes/instances/" "./generators/termes/plans/"
